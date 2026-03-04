@@ -1,0 +1,5 @@
+<Solution>
+  <Project Path="TaskManager.AppHost/TaskManager.AppHost.csproj" />
+  <Project Path="TaskManager.Backend/TaskManager.Backend.csproj" />
+  <Project Path="TaskManager.ServiceDefaults/TaskManager.ServiceDefaults.csproj" />
+</Solution>
