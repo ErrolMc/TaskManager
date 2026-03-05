@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using System.Text;
 using TaskManager.Backend.Data;
@@ -28,6 +29,7 @@ namespace TaskManager.Backend
             services.AddScoped<IAuthService, AuthService>();
 
             services.AddHostedService<TokenCleanupService>();
+            services.AddHttpLogging(options => { });
 
             services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
                 .AddJwtBearer(options =>
@@ -56,12 +58,19 @@ namespace TaskManager.Backend
 
             WebApplication app = builder.Build();
 
+            using (var scope = app.Services.CreateScope())
+            {
+                var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+                db.Database.Migrate();
+            }
+
             app.MapDefaultEndpoints();
 
             // Configure the HTTP request pipeline.
             if (app.Environment.IsDevelopment())
             {
                 app.MapOpenApi();
+                app.UseHttpLogging();
             }
 
             app.UseHttpsRedirection();

@@ -1,5 +1,6 @@
 ## .NET
 bin/
+bin\\*/
 obj/
 *.user
 *.userosscache
@@ -73,6 +74,9 @@ Desktop.ini
 
 ## Aspire
 .aspire/
+
+## Migrations
+TaskManager.Backend/Migrations/
 
 ## Claude
 .claude/
