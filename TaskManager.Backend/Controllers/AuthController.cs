@@ -1,12 +1,11 @@
-﻿using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Identity;
+﻿using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.Data;
 using Microsoft.AspNetCore.Mvc;
-using TaskManager.Backend.Contracts;
+using TaskManager.Backend.Contracts.Auth;
 using TaskManager.Backend.Models;
 using TaskManager.Backend.Repositories;
 using TaskManager.Backend.Services;
-using LoginRequest = TaskManager.Backend.Contracts.LoginRequest;
+using LoginRequest = TaskManager.Backend.Contracts.Auth.LoginRequest;
 
 namespace TaskManager.Backend.Controllers
 {
@@ -32,6 +31,8 @@ namespace TaskManager.Backend.Controllers
         }
 
         [HttpPost("register")]
+        [ProducesResponseType(StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status500InternalServerError)]
         public async Task<IActionResult> Register([FromBody] LoginRequest request)
         {
             var existingUser = await _userRepository.GetUserByUsernameAsync(request.Username);
@@ -71,7 +72,6 @@ namespace TaskManager.Backend.Controllers
             return Ok(new LoginResponse() { UserID = user.UserID, Token = accessToken, RefreshToken = refreshToken });
         }
 
-        [Authorize]
         [HttpPost("refresh")]
         [ProducesResponseType<LoginResponse>(StatusCodes.Status200OK)]
         [ProducesResponseType<LoginResponse>(StatusCodes.Status401Unauthorized)]

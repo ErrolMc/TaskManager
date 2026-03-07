@@ -26,6 +26,8 @@ namespace TaskManager.Backend
 
             services.AddScoped<IUserRepository, UserRepository>();
             services.AddScoped<IRefreshTokenRepository, RefreshTokenRepository>();
+            services.AddScoped<IBoardRepository, BoardRepository>();
+            services.AddScoped<IBoardMemberRepository, BoardMemberRepository>();
             services.AddScoped<IAuthService, AuthService>();
 
             services.AddHostedService<TokenCleanupService>();
@@ -76,6 +78,7 @@ namespace TaskManager.Backend
             app.UseHttpsRedirection();
 
             app.UseCors();
+            app.UseAuthentication();
             app.UseAuthorization();
 
             app.MapControllers();

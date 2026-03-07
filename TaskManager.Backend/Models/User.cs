@@ -8,6 +8,9 @@ namespace TaskManager.Backend.Models
         public string Username { get; set; } = string.Empty;
         public string PasswordHash { get; set; } = string.Empty;
 
+        // nav properties
+        public ICollection<BoardMember> BoardMemberships { get; set; } = new List<BoardMember>();
+
         public UserDTO AsUserDTO() => new UserDTO
         {
             UserID = this.UserID,

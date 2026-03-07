@@ -9,6 +9,8 @@ namespace TaskManager.Backend.Data
 
         public DbSet<User> Users { get; set; }
         public DbSet<RefreshToken> RefreshTokens { get; set; }
+        public DbSet<Board> Boards { get; set; }
+        public DbSet<BoardMember> BoardMembers { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -25,6 +27,25 @@ namespace TaskManager.Backend.Data
                 entity.HasOne<User>()
                       .WithMany()
                       .HasForeignKey(e => e.UserID);
+            });
+
+            modelBuilder.Entity<Board>(entity =>
+            {
+                entity.HasKey(entity => entity.ID);
+                entity.HasOne(e => e.Owner)
+                      .WithMany()
+                      .HasForeignKey(e => e.OwnerUserID);
+            });
+
+            modelBuilder.Entity<BoardMember>(entity =>
+            {
+                entity.HasKey(e => new { e.BoardID, e.UserID });
+                entity.HasOne(e => e.User)
+                      .WithMany(u => u.BoardMemberships)
+                      .HasForeignKey(e => e.UserID);
+                entity.HasOne(e => e.Board)
+                      .WithMany()
+                      .HasForeignKey(e => e.BoardID);
             });
         }
     }

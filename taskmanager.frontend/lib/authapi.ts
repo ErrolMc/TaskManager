@@ -42,16 +42,10 @@ export async function register(
   return res.text();
 }
 
-export async function refreshToken(
-  token: string,
-  refresh: string
-): Promise<LoginResponse> {
+export async function refreshToken(refresh: string): Promise<LoginResponse> {
   const res = await fetch(`${API_BASE}/refresh`, {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${token}`,
-    },
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ refreshToken: refresh }),
   });
 

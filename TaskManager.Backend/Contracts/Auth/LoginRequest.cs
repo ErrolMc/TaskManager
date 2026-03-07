@@ -1,4 +1,4 @@
-﻿namespace TaskManager.Backend.Contracts
+﻿namespace TaskManager.Backend.Contracts.Auth
 {
     public class LoginRequest
     {

@@ -8,7 +8,7 @@ import {
   useCallback,
   type ReactNode,
 } from "react";
-import { type LoginResponse, refreshToken as refreshTokenApi } from "./api";
+import { type LoginResponse, refreshToken as refreshTokenApi } from "./authapi";
 
 interface AuthState {
   userID: string | null;
@@ -19,6 +19,7 @@ interface AuthState {
 }
 
 const AuthContext = createContext<AuthState | null>(null);
+const REFRESH_INTERVAL_MS = 14 * 60 * 1000;
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [userID, setUserID] = useState<string | null>(null);
@@ -40,15 +41,31 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     const storedRefresh = localStorage.getItem("refreshToken");
-    const storedToken = token;
-    const storedUserID = localStorage.getItem("userID");
 
-    if (storedRefresh && storedUserID && storedToken) {
-      refreshTokenApi(storedToken, storedRefresh)
+    if (storedRefresh) {
+      refreshTokenApi(storedRefresh)
         .then(login)
         .catch(() => logout());
     }
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [login, logout]);
+
+  useEffect(() => {
+    if (!token) return;
+
+    const intervalId = window.setInterval(() => {
+      const storedRefresh = localStorage.getItem("refreshToken");
+      if (!storedRefresh) {
+        logout();
+        return;
+      }
+
+      refreshTokenApi(storedRefresh)
+        .then(login)
+        .catch(() => logout());
+    }, REFRESH_INTERVAL_MS);
+
+    return () => window.clearInterval(intervalId);
+  }, [token, login, logout]);
 
   return (
     <AuthContext.Provider
