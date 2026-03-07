@@ -6,6 +6,7 @@ namespace TaskManager.Backend.Repositories
     {
         public Task<bool> CreateBoardMemberAsync(BoardMember boardMember);
         public Task<BoardMember?> GetBoardMemberAsync(string boardID, string userID);
+        public Task<bool> DeleteBoardMemberAsync(string boardID, string userID);
         public Task<bool> DeleteBoardMembersAsync(string boardID);
     }
 }

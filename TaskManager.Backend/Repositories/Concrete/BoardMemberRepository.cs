@@ -25,6 +25,18 @@ namespace TaskManager.Backend.Repositories.Concrete
                 .FirstOrDefaultAsync(m => m.BoardID == boardID && m.UserID == userID);
         }
 
+        public async Task<bool> DeleteBoardMemberAsync(string boardID, string userID)
+        {
+            var boardMember = await _context.BoardMembers
+                .FirstOrDefaultAsync(m => m.BoardID == boardID && m.UserID == userID);
+
+            if (boardMember == null)
+                return false;
+
+            _context.BoardMembers.Remove(boardMember);
+            return await _context.SaveChangesAsync() > 0;
+        }
+
         public async Task<bool> DeleteBoardMembersAsync(string boardID)
         {
             var boardMembers = await _context.BoardMembers
