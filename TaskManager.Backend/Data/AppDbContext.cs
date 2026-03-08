@@ -34,7 +34,8 @@ namespace TaskManager.Backend.Data
                 entity.HasKey(entity => entity.ID);
                 entity.HasOne(e => e.Owner)
                       .WithMany()
-                      .HasForeignKey(e => e.OwnerUserID);
+                      .HasForeignKey(e => e.OwnerUserID)
+                      .OnDelete(DeleteBehavior.NoAction);
             });
 
             modelBuilder.Entity<BoardMember>(entity =>
@@ -42,10 +43,12 @@ namespace TaskManager.Backend.Data
                 entity.HasKey(e => new { e.BoardID, e.UserID });
                 entity.HasOne(e => e.User)
                       .WithMany(u => u.BoardMemberships)
-                      .HasForeignKey(e => e.UserID);
+                      .HasForeignKey(e => e.UserID)
+                      .OnDelete(DeleteBehavior.NoAction);
                 entity.HasOne(e => e.Board)
                       .WithMany()
-                      .HasForeignKey(e => e.BoardID);
+                      .HasForeignKey(e => e.BoardID)
+                      .OnDelete(DeleteBehavior.Cascade);
             });
         }
     }

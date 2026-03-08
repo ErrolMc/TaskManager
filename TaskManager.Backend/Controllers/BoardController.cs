@@ -132,8 +132,8 @@ namespace TaskManager.Backend.Controllers
             if (string.IsNullOrWhiteSpace(request.BoardID))
                 return BadRequest("Board ID is required");
 
-            if (string.IsNullOrWhiteSpace(request.UserID))
-                return BadRequest("User ID is required");
+            if (string.IsNullOrWhiteSpace(request.Username))
+                return BadRequest("Username is required");
 
             if (!Enum.IsDefined(request.Role))
                 return BadRequest("Invalid board role");
@@ -157,18 +157,21 @@ namespace TaskManager.Backend.Controllers
             if (!canManageMembers)
                 return Forbid();
 
-            User? userToAdd = await _userRepository.GetUserByIdAsync(request.UserID);
+            if (currentUserMembership?.Role == Role.Admin && (request.Role == Role.Admin || request.Role == Role.Owner))
+                return Forbid("Admins cannot assign admin/owner role to other users");
+
+            User? userToAdd = await _userRepository.GetUserByUsernameAsync(request.Username);
             if (userToAdd == null)
                 return NotFound("User not found");
-            
-            BoardMember? existingMembership = await _boardMemberRepository.GetBoardMemberAsync(request.BoardID, request.UserID);
+
+            BoardMember? existingMembership = await _boardMemberRepository.GetBoardMemberAsync(request.BoardID, userToAdd.UserID);
             if (existingMembership != null)
                 return Conflict("User is already a board member");
 
             var boardMember = new BoardMember
             {
                 BoardID = request.BoardID,
-                UserID = request.UserID,
+                UserID = userToAdd.UserID,
                 Role = request.Role,
                 JoinedAtUTC = DateTime.UtcNow
             };
@@ -232,7 +235,7 @@ namespace TaskManager.Backend.Controllers
         [ProducesResponseType(StatusCodes.Status401Unauthorized)]
         [ProducesResponseType(StatusCodes.Status403Forbidden)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
-        public async Task<IActionResult> GetBoardInfo([FromBody] GetBoardInfoRequest request)
+        public async Task<IActionResult> GetBoardInfo([FromQuery] GetBoardInfoRequest request)
         {
             if (string.IsNullOrWhiteSpace(request.BoardID))
                 return BadRequest("Board ID is required");
@@ -292,6 +295,63 @@ namespace TaskManager.Backend.Controllers
             }).ToList();
 
             return Ok(boards);
+        }
+
+        [HttpPost("changerole")]
+        [ProducesResponseType(StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+        [ProducesResponseType(StatusCodes.Status403Forbidden)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+        public async Task<IActionResult> ChangeBoardMemberRole([FromBody] ChangeBoardMemberRoleRequest request)
+        {
+            if (string.IsNullOrWhiteSpace(request.BoardID))
+                return BadRequest("Board ID is required");
+
+            if (string.IsNullOrWhiteSpace(request.UserID))
+                return BadRequest("User ID is required");
+
+            if (!Enum.IsDefined(request.NewRole))
+                return BadRequest("Invalid board role");
+
+            if (request.NewRole == Role.Owner)
+                return BadRequest("Use ownership transfer flow to assign owner role");
+
+            string? currentUserID = GetCurrentUserID();
+            if (string.IsNullOrWhiteSpace(currentUserID))
+                return Unauthorized("Unable to resolve authenticated user");
+
+            Board? board = await _boardRepository.GetBoardByIdAsync(request.BoardID);
+            if (board == null)
+                return NotFound("Board not found");
+
+            BoardMember? currentUserMembership = await _boardMemberRepository.GetBoardMemberAsync(request.BoardID, currentUserID);
+            bool canManageMembers = board.OwnerUserID == currentUserID
+                || currentUserMembership?.Role == Role.Owner
+                || currentUserMembership?.Role == Role.Admin;
+
+            if (!canManageMembers)
+                return Forbid();
+
+            if (currentUserMembership?.Role == Role.Admin && (request.NewRole == Role.Admin || request.NewRole == Role.Owner))
+                return Forbid("Admins cannot assign admin role to other users");
+
+            BoardMember? targetMembership = await _boardMemberRepository.GetBoardMemberAsync(request.BoardID, request.UserID);
+            if (targetMembership == null)
+                return NotFound("Board member not found");
+
+            if (targetMembership.Role == Role.Owner)
+                return BadRequest("Cannot change the role of the board owner");
+
+            if (currentUserMembership?.Role == Role.Admin && targetMembership.Role == Role.Admin)
+                return Forbid("Admins cannot change the role of other admins");
+
+            bool roleUpdated = await _boardMemberRepository.UpdateBoardMemberRoleAsync(request.BoardID, request.UserID, request.NewRole);
+            if (!roleUpdated)
+                return StatusCode(StatusCodes.Status500InternalServerError, "Failed to update board member role");
+
+            return Ok("Board member role updated successfully");
         }
 
         private string? GetCurrentUserID()

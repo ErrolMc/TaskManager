@@ -2,10 +2,10 @@ using TaskManager.Backend.Models.Enums;
 
 namespace TaskManager.Backend.Contracts.Api.Boards
 {
-    public class AddUserToBoardRequest
+    public class ChangeBoardMemberRoleRequest
     {
         public string BoardID { get; set; } = string.Empty;
-        public string Username { get; set; } = string.Empty;
-        public Role Role { get; set; }
+        public string UserID { get; set; } = string.Empty;
+        public Role NewRole { get; set; }
     }
 }

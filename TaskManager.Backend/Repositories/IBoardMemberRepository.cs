@@ -8,6 +8,7 @@ namespace TaskManager.Backend.Repositories
         public Task<BoardMember?> GetBoardMemberAsync(string boardID, string userID);
         public Task<List<BoardMember>> GetBoardMembersAsync(string boardID);
         public Task<List<BoardMember>> GetBoardMembershipsForUserAsync(string userID);
+        public Task<bool> UpdateBoardMemberRoleAsync(string boardID, string userID, Models.Enums.Role newRole);
         public Task<bool> DeleteBoardMemberAsync(string boardID, string userID);
         public Task<bool> DeleteBoardMembersAsync(string boardID);
     }

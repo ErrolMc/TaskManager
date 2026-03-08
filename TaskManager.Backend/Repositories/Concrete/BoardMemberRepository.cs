@@ -1,6 +1,7 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using TaskManager.Backend.Data;
 using TaskManager.Backend.Models;
+using TaskManager.Backend.Models.Enums;
 
 namespace TaskManager.Backend.Repositories.Concrete
 {
@@ -39,6 +40,18 @@ namespace TaskManager.Backend.Repositories.Concrete
                 .Include(m => m.Board)
                 .Where(m => m.UserID == userID)
                 .ToListAsync();
+        }
+
+        public async Task<bool> UpdateBoardMemberRoleAsync(string boardID, string userID, Role newRole)
+        {
+            var boardMember = await _context.BoardMembers
+                .FirstOrDefaultAsync(m => m.BoardID == boardID && m.UserID == userID);
+
+            if (boardMember == null)
+                return false;
+
+            boardMember.Role = newRole;
+            return await _context.SaveChangesAsync() > 0;
         }
 
         public async Task<bool> DeleteBoardMemberAsync(string boardID, string userID)
