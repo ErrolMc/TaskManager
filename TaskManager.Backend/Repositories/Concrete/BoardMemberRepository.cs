@@ -25,6 +25,22 @@ namespace TaskManager.Backend.Repositories.Concrete
                 .FirstOrDefaultAsync(m => m.BoardID == boardID && m.UserID == userID);
         }
 
+        public async Task<List<BoardMember>> GetBoardMembersAsync(string boardID)
+        {
+            return await _context.BoardMembers.AsNoTracking()
+                .Include(m => m.User)
+                .Where(m => m.BoardID == boardID)
+                .ToListAsync();
+        }
+
+        public async Task<List<BoardMember>> GetBoardMembershipsForUserAsync(string userID)
+        {
+            return await _context.BoardMembers.AsNoTracking()
+                .Include(m => m.Board)
+                .Where(m => m.UserID == userID)
+                .ToListAsync();
+        }
+
         public async Task<bool> DeleteBoardMemberAsync(string boardID, string userID)
         {
             var boardMember = await _context.BoardMembers

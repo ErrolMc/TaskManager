@@ -1,4 +1,4 @@
-﻿namespace TaskManager.Backend.Contracts.Auth
+﻿namespace TaskManager.Backend.Contracts.Api.Auth
 {
     public class LoginResponse
     {

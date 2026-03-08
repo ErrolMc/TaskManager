@@ -1,8 +1,10 @@
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.AspNetCore.SignalR;
 using Microsoft.IdentityModel.Tokens;
 using System.Text;
 using TaskManager.Backend.Data;
+using TaskManager.Backend.Hubs;
 using TaskManager.Backend.Repositories;
 using TaskManager.Backend.Repositories.Concrete;
 using TaskManager.Backend.Services;
@@ -23,12 +25,15 @@ namespace TaskManager.Backend
 
             services.AddControllers();
             services.AddOpenApi();
+            services.AddSignalR();
 
             services.AddScoped<IUserRepository, UserRepository>();
             services.AddScoped<IRefreshTokenRepository, RefreshTokenRepository>();
             services.AddScoped<IBoardRepository, BoardRepository>();
             services.AddScoped<IBoardMemberRepository, BoardMemberRepository>();
             services.AddScoped<IAuthService, AuthService>();
+            services.AddScoped<INotificationService, NotificationService>();
+            services.AddSingleton<IUserIdProvider, JwtSubUserIdProvider>();
 
             services.AddHostedService<TokenCleanupService>();
             services.AddHttpLogging(options => { });
@@ -45,6 +50,23 @@ namespace TaskManager.Backend
                         ValidIssuer = Constants.BACKEND_URI,
                         ValidAudiences = [ Constants.WEB_APP_URI ],
                         IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(Constants.JWT_SIGNING_KEY))
+                    };
+
+                    options.Events = new JwtBearerEvents
+                    {
+                        OnMessageReceived = context =>
+                        {
+                            var accessToken = context.Request.Query["access_token"];
+                            var requestPath = context.HttpContext.Request.Path;
+
+                            if (!string.IsNullOrWhiteSpace(accessToken)
+                                && requestPath.StartsWithSegments("/hubs/notifications"))
+                            {
+                                context.Token = accessToken;
+                            }
+
+                            return Task.CompletedTask;
+                        }
                     };
                 });
 
@@ -82,6 +104,7 @@ namespace TaskManager.Backend
             app.UseAuthorization();
 
             app.MapControllers();
+            app.MapHub<NotificationHub>("/hubs/notifications");
 
             app.Run();
         }

@@ -1,11 +1,11 @@
 ﻿using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.Data;
 using Microsoft.AspNetCore.Mvc;
-using TaskManager.Backend.Contracts.Auth;
+using TaskManager.Backend.Contracts.Api.Auth;
 using TaskManager.Backend.Models;
 using TaskManager.Backend.Repositories;
 using TaskManager.Backend.Services;
-using LoginRequest = TaskManager.Backend.Contracts.Auth.LoginRequest;
+using LoginRequest = TaskManager.Backend.Contracts.Api.Auth.LoginRequest;
 
 namespace TaskManager.Backend.Controllers
 {

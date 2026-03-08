@@ -1,8 +1,7 @@
-﻿namespace TaskManager.Backend.Contracts.Boards
+﻿namespace TaskManager.Backend.Contracts.Api.Boards
 {
-    public class CreateBoardResponse
+    public class CreateBoardRequest
     {
-        public string BoardID { get; set; } = string.Empty;
         public string BoardName { get; set; } = string.Empty;
         public string BoardDescription { get; set; } = string.Empty;
     }

@@ -2,8 +2,9 @@
 using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using TaskManager.Backend.Contracts.Boards;
+using TaskManager.Backend.Contracts.Api.Boards;
 using TaskManager.Backend.Models;
+using TaskManager.Backend.Models.DTOs;
 using TaskManager.Backend.Models.Enums;
 using TaskManager.Backend.Repositories;
 
@@ -223,6 +224,74 @@ namespace TaskManager.Backend.Controllers
                 return StatusCode(StatusCodes.Status500InternalServerError, "Failed to remove user from board");
 
             return Ok("User removed from board successfully");
+        }
+
+        [HttpGet("getboardinfo")]
+        [ProducesResponseType<GetBoardInfoResponse>(StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+        [ProducesResponseType(StatusCodes.Status403Forbidden)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        public async Task<IActionResult> GetBoardInfo([FromBody] GetBoardInfoRequest request)
+        {
+            if (string.IsNullOrWhiteSpace(request.BoardID))
+                return BadRequest("Board ID is required");
+
+            string? currentUserID = GetCurrentUserID();
+            if (string.IsNullOrWhiteSpace(currentUserID))
+                return Unauthorized("Unable to resolve authenticated user");
+
+            Board? board = await _boardRepository.GetBoardByIdAsync(request.BoardID);
+            if (board == null)
+                return NotFound("Board not found");
+
+            BoardMember? currentUserMembership = await _boardMemberRepository.GetBoardMemberAsync(request.BoardID, currentUserID);
+            if (currentUserMembership == null)
+                return Forbid();
+
+            List<BoardMember> members = await _boardMemberRepository.GetBoardMembersAsync(request.BoardID);
+
+            var response = new GetBoardInfoResponse()
+            {
+                BoardInfo = new BoardInfoDTO()
+                {
+                    BoardID = board.ID,
+                    BoardName = board.Name,
+                    Description = board.Description,
+                    CreatedAtUTC = board.CreatedAtUTC,
+                    UpdatedAtUTC = board.UpdatedAtUTC,
+                },
+                Members = members.Select(m => new BoardMemberDTO
+                {
+                    User = m.User.AsUserDTO(),
+                    Role = m.Role
+                }).ToList()
+            };
+
+            return Ok(response);
+        }
+
+        [HttpGet("getboardsforcurrentuser")]
+        [ProducesResponseType<List<BoardInfoDTO>>(StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+        public async Task<IActionResult> GetBoardsForCurrentUser()
+        {
+            string? currentUserID = GetCurrentUserID();
+            if (string.IsNullOrWhiteSpace(currentUserID))
+                return Unauthorized("Unable to resolve authenticated user");
+
+            List<BoardMember> memberships = await _boardMemberRepository.GetBoardMembershipsForUserAsync(currentUserID);
+
+            var boards = memberships.Select(m => new BoardInfoDTO
+            {
+                BoardID = m.BoardID,
+                BoardName = m.Board.Name,
+                Description = m.Board.Description,
+                CreatedAtUTC = m.Board.CreatedAtUTC,
+                UpdatedAtUTC = m.Board.UpdatedAtUTC
+            }).ToList();
+
+            return Ok(boards);
         }
 
         private string? GetCurrentUserID()

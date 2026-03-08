@@ -1,4 +1,4 @@
-﻿namespace TaskManager.Backend.Contracts.Boards
+﻿namespace TaskManager.Backend.Contracts.Api.Boards
 {
     public class RemoveUserFromBoardRequest
     {

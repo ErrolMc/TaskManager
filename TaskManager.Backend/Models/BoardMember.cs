@@ -1,4 +1,5 @@
-﻿using TaskManager.Backend.Models.Enums;
+﻿using TaskManager.Backend.Models.DTOs;
+using TaskManager.Backend.Models.Enums;
 
 namespace TaskManager.Backend.Models
 {
