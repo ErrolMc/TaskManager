@@ -18,17 +18,23 @@ namespace TaskManager.Backend.Controllers
         private readonly ILogger<BoardController> _logger;
         private readonly IBoardRepository _boardRepository;
         private readonly IBoardMemberRepository _boardMemberRepository;
+        private readonly IListColumnRepository _listColumnRepository;
+        private readonly ICardRepository _cardRepository;
         private readonly IUserRepository _userRepository;
 
         public BoardController(
             ILogger<BoardController> logger,
             IBoardRepository boardRepository,
             IBoardMemberRepository boardMemberRepository,
+            IListColumnRepository listColumnRepository,
+            ICardRepository cardRepository,
             IUserRepository userRepository)
         {
             _logger = logger;
             _boardRepository = boardRepository;
             _boardMemberRepository = boardMemberRepository;
+            _listColumnRepository = listColumnRepository;
+            _cardRepository = cardRepository;
             _userRepository = userRepository;
         }
 
@@ -253,6 +259,13 @@ namespace TaskManager.Backend.Controllers
                 return Forbid();
 
             List<BoardMember> members = await _boardMemberRepository.GetBoardMembersAsync(request.BoardID);
+            List<ListColumn> listColumns = await _listColumnRepository.GetListColumnsForBoardAsync(request.BoardID);
+            List<Card> cards = await _cardRepository.GetCardsForBoardAsync(request.BoardID);
+            var cardsByColumnID = cards
+                .GroupBy(c => c.ColumnID)
+                .ToDictionary(
+                    group => group.Key,
+                    group => group.OrderBy(c => c.Position).ThenBy(c => c.CardID).ToList());
 
             var response = new GetBoardInfoResponse()
             {
@@ -268,6 +281,28 @@ namespace TaskManager.Backend.Controllers
                 {
                     User = m.User.AsUserDTO(),
                     Role = m.Role
+                }).ToList(),
+                ListColumns = listColumns.Select(listColumn => new BoardListColumnDTO
+                {
+                    ColumnID = listColumn.ColumnID,
+                    BoardID = listColumn.BoardID,
+                    Name = listColumn.Name,
+                    Position = listColumn.Position,
+                    CreatedAtUTC = listColumn.CreatedAtUTC,
+                    UpdatedAtUTC = listColumn.UpdatedAtUTC,
+                    Cards = cardsByColumnID.TryGetValue(listColumn.ColumnID, out List<Card>? columnCards)
+                        ? columnCards.Select(card => new BoardCardDTO
+                        {
+                            CardID = card.CardID,
+                            ColumnID = card.ColumnID,
+                            Title = card.Title,
+                            Description = card.Description,
+                            Position = card.Position,
+                            DueAtUTC = card.DueAtUTC,
+                            CreatedByUserID = card.CreatedByUserID,
+                            IsArchived = card.IsArchived
+                        }).ToList()
+                        : []
                 }).ToList()
             };
 

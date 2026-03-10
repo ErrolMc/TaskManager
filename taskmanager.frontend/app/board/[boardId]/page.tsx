@@ -12,14 +12,21 @@ import {
   type BoardDetailsResponse,
   type BoardRole,
 } from "@/lib/boardapi";
+import { useBoardWorkspace } from "./hooks/use-board-workspace";
+import { useBoardWorkspaceRenderer } from "./hooks/use-board-workspace-renderer";
 
 function roleLabel(role: BoardRole) {
   switch (role) {
-    case 0: return "Owner";
-    case 1: return "Admin";
-    case 2: return "Member";
-    case 3: return "Viewer";
-    default: return "Unknown";
+    case 0:
+      return "Owner";
+    case 1:
+      return "Admin";
+    case 2:
+      return "Member";
+    case 3:
+      return "Viewer";
+    default:
+      return "Unknown";
   }
 }
 
@@ -62,14 +69,21 @@ export default function BoardViewPage() {
     if (!isAuthenticated) router.push("/login");
   }, [isAuthenticated, router]);
 
-  const loadBoard = useCallback(() => {
+  const loadBoard = useCallback(async () => {
     if (!isAuthenticated || !token || !boardId) return;
-    getBoardInfo(token, boardId)
-      .then((data) => setBoardData(data))
-      .catch((err) => setError(err instanceof Error ? err.message : "Failed to load board"));
+    setError("");
+
+    try {
+      const data = await getBoardInfo(token, boardId);
+      setBoardData(data);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to load board");
+    }
   }, [isAuthenticated, token, boardId]);
 
-  useEffect(() => { loadBoard(); }, [loadBoard]);
+  useEffect(() => {
+    void loadBoard();
+  }, [loadBoard]);
 
   // close context menu on outside click
   useEffect(() => {
@@ -86,11 +100,64 @@ export default function BoardViewPage() {
 
   const currentUserRole = useMemo(() => {
     if (!userID || !boardData) return null;
-    return boardData.members.find((m) => m.user.userID === userID)?.role ?? null;
+    return boardData.members.find((member) => member.user.userID === userID)?.role ?? null;
   }, [userID, boardData]);
 
   const isOwner = currentUserRole === 0;
   const canManageMembers = currentUserRole === 0 || currentUserRole === 1;
+  const canEditBoard = currentUserRole !== null && currentUserRole !== 3;
+
+  const isLoading = !boardData && !error;
+
+  const boardWorkspace = useBoardWorkspace({
+    token,
+    boardId,
+    canEditBoard,
+    boardData,
+    setBoardData,
+    loadBoard,
+  });
+
+  const boardWorkspaceSection = useBoardWorkspaceRenderer({
+    isLoading,
+    error,
+    boardActionError: boardWorkspace.boardActionError,
+    canEditBoard,
+    newColumnName: boardWorkspace.newColumnName,
+    setNewColumnName: boardWorkspace.setNewColumnName,
+    createColumnLoading: boardWorkspace.createColumnLoading,
+    cardTitles: boardWorkspace.cardTitles,
+    creatingCards: boardWorkspace.creatingCards,
+    orderedColumns: boardWorkspace.orderedColumns,
+    columnDragState: boardWorkspace.columnDragState,
+    cardDragState: boardWorkspace.cardDragState,
+    editingColumnID: boardWorkspace.editingColumnID,
+    editColumnName: boardWorkspace.editColumnName,
+    savingColumnID: boardWorkspace.savingColumnID,
+    editingCardID: boardWorkspace.editingCardID,
+    savingCardID: boardWorkspace.savingCardID,
+    onSetCardTitle: boardWorkspace.setCardTitle,
+    onSetEditColumnName: boardWorkspace.setEditColumnName,
+    onSetEditCardTitle: boardWorkspace.setEditCardTitle,
+    onSetEditCardDescription: boardWorkspace.setEditCardDescription,
+    onGetCardTitleValue: boardWorkspace.getCardTitleValue,
+    onGetCardDescriptionValue: boardWorkspace.getCardDescriptionValue,
+    onIsCardDirty: boardWorkspace.isCardDirty,
+    onStartEditingColumn: boardWorkspace.startEditingColumn,
+    onCancelEditingColumn: boardWorkspace.cancelEditingColumn,
+    onSaveColumnEdit: boardWorkspace.handleSaveColumnEdit,
+    onStartEditingCard: boardWorkspace.startEditingCard,
+    onCancelEditingCard: boardWorkspace.cancelEditingCard,
+    onSaveCardEdit: boardWorkspace.handleSaveCardEdit,
+    onCreateListColumn: boardWorkspace.handleCreateListColumn,
+    onCreateCard: boardWorkspace.handleCreateCard,
+    onColumnDragStart: boardWorkspace.handleColumnDragStart,
+    onColumnDragEnd: boardWorkspace.clearColumnDragState,
+    onColumnDrop: boardWorkspace.handleColumnDrop,
+    onCardDragStart: boardWorkspace.handleCardDragStart,
+    onCardDragEnd: boardWorkspace.clearCardDragState,
+    onCardDrop: boardWorkspace.handleCardDrop,
+  });
 
   function handleMemberClick(e: React.MouseEvent, member: BoardMember) {
     if (!isOwner) return;
@@ -108,7 +175,7 @@ export default function BoardViewPage() {
     try {
       await removeUserFromBoard(token, boardId, member.user.userID);
       setContextMenu(null);
-      loadBoard();
+      await loadBoard();
     } catch (err) {
       setActionError(err instanceof Error ? err.message : "Failed to remove member");
     } finally {
@@ -124,7 +191,7 @@ export default function BoardViewPage() {
       await changeUserRole(token, boardId, member.user.userID, newRole);
       setContextMenu(null);
       setChangeRoleOpen(false);
-      loadBoard();
+      await loadBoard();
     } catch (err) {
       setActionError(err instanceof Error ? err.message : "Failed to change role");
     } finally {
@@ -142,7 +209,7 @@ export default function BoardViewPage() {
       await addUserToBoard(token, boardId, addUsername.trim(), addRole);
       setAddSuccess(`${addUsername.trim()} added successfully.`);
       setAddUsername("");
-      loadBoard();
+      await loadBoard();
     } catch (err) {
       setAddError(err instanceof Error ? err.message : "Failed to add member");
     } finally {
@@ -152,12 +219,10 @@ export default function BoardViewPage() {
 
   if (!isAuthenticated) return null;
 
-  const isLoading = !boardData && !error;
-
   return (
     <div className="min-h-screen bg-background">
       <header className="border-b border-foreground/10">
-        <div className="max-w-5xl mx-auto px-6 py-4 flex items-center justify-between gap-4">
+        <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             <button
               type="button"
@@ -171,12 +236,15 @@ export default function BoardViewPage() {
                 {boardData?.boardInfo.boardName ?? "Board"}
               </h1>
               <p className="text-sm text-foreground/60">
-                {isOwner ? "You are an owner" : "You are not an owner"}
+                {currentUserRole === null ? "Role unavailable" : `Role: ${roleLabel(currentUserRole)}`}
               </p>
             </div>
           </div>
           <button
-            onClick={() => { logout(); router.push("/login"); }}
+            onClick={() => {
+              logout();
+              router.push("/login");
+            }}
             className="text-sm px-3 py-1 border border-foreground/20 rounded-lg hover:bg-foreground/5 transition-colors"
           >
             Sign Out
@@ -184,14 +252,18 @@ export default function BoardViewPage() {
         </div>
       </header>
 
-      <main className="max-w-5xl mx-auto px-6 py-8 space-y-6">
+      <main className="max-w-7xl mx-auto px-6 py-8 space-y-6">
         <section className="p-5 border border-foreground/10 rounded-xl">
           <div className="flex items-center justify-between mb-4">
             <h2 className="font-medium">Board Members</h2>
             {canManageMembers && (
               <button
                 type="button"
-                onClick={() => { setShowAddForm((v) => !v); setAddError(""); setAddSuccess(""); }}
+                onClick={() => {
+                  setShowAddForm((current) => !current);
+                  setAddError("");
+                  setAddSuccess("");
+                }}
                 className="text-sm px-3 py-1 border border-foreground/20 rounded-lg hover:bg-foreground/5 transition-colors"
               >
                 Add Member +
@@ -221,8 +293,10 @@ export default function BoardViewPage() {
                   onChange={(e) => setAddRole(Number(e.target.value) as BoardRole)}
                   className="px-3 py-2 border border-foreground/20 rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-foreground/30"
                 >
-                  {ASSIGNABLE_ROLES.map((r) => (
-                    <option key={r.value} value={r.value}>{r.label}</option>
+                  {ASSIGNABLE_ROLES.map((role) => (
+                    <option key={role.value} value={role.value}>
+                      {role.label}
+                    </option>
                   ))}
                 </select>
                 <button
@@ -262,9 +336,10 @@ export default function BoardViewPage() {
             </div>
           )}
         </section>
+
+        {boardWorkspaceSection}
       </main>
 
-      {/* Context menu */}
       {contextMenu && (
         <div
           ref={menuRef}
@@ -279,10 +354,9 @@ export default function BoardViewPage() {
             <p className="px-3 py-1 text-red-500 text-xs">{actionError}</p>
           )}
 
-          {/* Change Role */}
           <button
             type="button"
-            onClick={() => setChangeRoleOpen((v) => !v)}
+            onClick={() => setChangeRoleOpen((current) => !current)}
             disabled={actionLoading}
             className="w-full text-left px-3 py-2 hover:bg-foreground/5 transition-colors flex items-center justify-between"
           >
@@ -292,21 +366,20 @@ export default function BoardViewPage() {
 
           {changeRoleOpen && (
             <div className="border-t border-foreground/10">
-              {ASSIGNABLE_ROLES.map((r) => (
+              {ASSIGNABLE_ROLES.map((role) => (
                 <button
-                  key={r.value}
+                  key={role.value}
                   type="button"
-                  disabled={actionLoading || contextMenu.member.role === r.value}
-                  onClick={() => handleChangeRole(contextMenu.member, r.value)}
+                  disabled={actionLoading || contextMenu.member.role === role.value}
+                  onClick={() => handleChangeRole(contextMenu.member, role.value)}
                   className="w-full text-left px-5 py-1.5 hover:bg-foreground/5 transition-colors disabled:opacity-40"
                 >
-                  {r.label}
+                  {role.label}
                 </button>
               ))}
             </div>
           )}
 
-          {/* Remove Member */}
           <button
             type="button"
             disabled={actionLoading}

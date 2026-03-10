@@ -20,6 +20,18 @@ namespace TaskManager.Backend.Repositories.Concrete
             return await _context.SaveChangesAsync() > 0;
         }
 
+        public async Task<List<Card>> GetCardsForBoardAsync(string boardID)
+        {
+            return await (
+                from card in _context.Cards.AsNoTracking()
+                join listColumn in _context.ListColumns.AsNoTracking()
+                    on card.ColumnID equals listColumn.ColumnID
+                where listColumn.BoardID == boardID
+                orderby listColumn.Position, card.Position, card.CardID
+                select card
+            ).ToListAsync();
+        }
+
         public async Task<int> GetNextPositionForColumnAsync(string columnID)
         {
             int? maxPosition = await _context.Cards.AsNoTracking()

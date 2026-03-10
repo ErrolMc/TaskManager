@@ -6,6 +6,7 @@ namespace TaskManager.Backend.Repositories
     public interface IListColumnRepository
     {
         public Task<bool> CreateListColumnAsync(ListColumn listColumn);
+        public Task<List<ListColumn>> GetListColumnsForBoardAsync(string boardID);
         public Task<int> GetNextPositionForBoardAsync(string boardID);
         public Task<ListColumn?> GetListColumnByIdAsync(string listColumnID);
         public Task<bool> UpdateListColumnAsync(string listColumnID, string name);

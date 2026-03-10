@@ -6,6 +6,6 @@ namespace TaskManager.Backend.Contracts.Api.Boards
     {
         public BoardInfoDTO BoardInfo { get; set; } = null!;
         public List<BoardMemberDTO> Members { get; set; } = [];
-        // cards
+        public List<BoardListColumnDTO> ListColumns { get; set; } = [];
     }
 }
