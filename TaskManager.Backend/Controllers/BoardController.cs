@@ -13,7 +13,7 @@ namespace TaskManager.Backend.Controllers
     [Authorize]
     [ApiController]
     [Route("api/board")]
-    public class BoardController : ControllerBase
+    public class BoardController : BaseTaskManagerController
     {
         private readonly ILogger<BoardController> _logger;
         private readonly IBoardRepository _boardRepository;
@@ -352,13 +352,6 @@ namespace TaskManager.Backend.Controllers
                 return StatusCode(StatusCodes.Status500InternalServerError, "Failed to update board member role");
 
             return Ok("Board member role updated successfully");
-        }
-
-        private string? GetCurrentUserID()
-        {
-            return User.FindFirstValue(JwtRegisteredClaimNames.Sub)
-                ?? User.FindFirstValue(ClaimTypes.NameIdentifier)
-                ?? User.FindFirstValue("sub");
         }
     }
 }

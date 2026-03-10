@@ -11,6 +11,8 @@ namespace TaskManager.Backend.Data
         public DbSet<RefreshToken> RefreshTokens { get; set; }
         public DbSet<Board> Boards { get; set; }
         public DbSet<BoardMember> BoardMembers { get; set; }
+        public DbSet<ListColumn> ListColumns { get; set; }
+        public DbSet<Card> Cards { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -49,6 +51,28 @@ namespace TaskManager.Backend.Data
                       .WithMany()
                       .HasForeignKey(e => e.BoardID)
                       .OnDelete(DeleteBehavior.Cascade);
+            });
+
+            modelBuilder.Entity<ListColumn>(entity =>
+            {
+                entity.HasKey(e => e.ColumnID);
+                entity.HasOne<Board>()
+                      .WithMany()
+                      .HasForeignKey(e => e.BoardID)
+                      .OnDelete(DeleteBehavior.Cascade);
+            });
+
+            modelBuilder.Entity<Card>(entity =>
+            {
+                entity.HasKey(e => e.CardID);
+                entity.HasOne<ListColumn>()
+                      .WithMany()
+                      .HasForeignKey(e => e.ColumnID)
+                      .OnDelete(DeleteBehavior.Cascade);
+                entity.HasOne<User>()
+                      .WithMany()
+                      .HasForeignKey(e => e.CreatedByUserID)
+                      .OnDelete(DeleteBehavior.NoAction);
             });
         }
     }

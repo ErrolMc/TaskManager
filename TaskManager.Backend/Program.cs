@@ -31,6 +31,8 @@ namespace TaskManager.Backend
             services.AddScoped<IRefreshTokenRepository, RefreshTokenRepository>();
             services.AddScoped<IBoardRepository, BoardRepository>();
             services.AddScoped<IBoardMemberRepository, BoardMemberRepository>();
+            services.AddScoped<IListColumnRepository, ListColumnRepository>();
+            services.AddScoped<ICardRepository, CardRepository>();
             services.AddScoped<IAuthService, AuthService>();
             services.AddScoped<INotificationService, NotificationService>();
             services.AddSingleton<IUserIdProvider, JwtSubUserIdProvider>();

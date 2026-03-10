@@ -11,7 +11,7 @@ namespace TaskManager.Backend.Controllers
 {
     [ApiController]
     [Route("api/auth")]
-    public class AuthController : ControllerBase
+    public class AuthController : BaseTaskManagerController
     {
         private readonly ILogger<AuthController> _logger;
         private readonly IAuthService _authService;
