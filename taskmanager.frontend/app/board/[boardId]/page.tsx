@@ -153,9 +153,10 @@ export default function BoardViewPage() {
     onCreateCard: boardWorkspace.handleCreateCard,
     onColumnDragStart: boardWorkspace.handleColumnDragStart,
     onColumnDragEnd: boardWorkspace.clearColumnDragState,
+    onColumnDragHover: boardWorkspace.handleColumnDragHover,
     onColumnDrop: boardWorkspace.handleColumnDrop,
     onCardDragStart: boardWorkspace.handleCardDragStart,
-    onCardDragEnd: boardWorkspace.clearCardDragState,
+    onCardDragHover: boardWorkspace.handleCardDragHover,
     onCardDrop: boardWorkspace.handleCardDrop,
   });
 

@@ -3,29 +3,14 @@ import {
   createCard,
   createListColumn,
   updateCard,
-  updateCardPosition,
   updateListColumn,
-  updateListColumnPosition,
   type BoardDetailsResponse,
-  type BoardListColumn,
 } from "@/lib/boardapi";
+import { normalizeColumns } from "./drag-utils";
+import { useColumnDrag } from "./use-column-drag";
+import { useCardDrag } from "./use-card-drag";
 
-export interface ColumnDragState {
-  columnID: string;
-  startIndex: number;
-}
-
-export interface CardDragState {
-  cardID: string;
-  sourceColumnID: string;
-  sourceIndex: number;
-}
-
-interface CardMoveResult {
-  listColumns: BoardListColumn[];
-  changed: boolean;
-  finalIndex: number;
-}
+export type { CardDragState, ColumnDragState } from "./drag-utils";
 
 interface UseBoardWorkspaceParams {
   token: string | null;
@@ -34,178 +19,6 @@ interface UseBoardWorkspaceParams {
   boardData: BoardDetailsResponse | null;
   setBoardData: Dispatch<SetStateAction<BoardDetailsResponse | null>>;
   loadBoard: () => Promise<void>;
-}
-
-function normalizeColumns(listColumns: BoardListColumn[]): BoardListColumn[] {
-  return listColumns
-    .slice()
-    .sort((a, b) => a.position - b.position)
-    .map((column, columnIndex) => ({
-      ...column,
-      position: columnIndex,
-      cards: column.cards
-        .slice()
-        .sort((a, b) => a.position - b.position)
-        .map((card, cardIndex) => ({ ...card, position: cardIndex })),
-    }));
-}
-
-function reorderColumns(
-  listColumns: BoardListColumn[],
-  startIndex: number,
-  endIndex: number
-): BoardListColumn[] {
-  const nextColumns = listColumns.map((column) => ({
-    ...column,
-    cards: column.cards.map((card) => ({ ...card })),
-  }));
-
-  const [movingColumn] = nextColumns.splice(startIndex, 1);
-  nextColumns.splice(endIndex, 0, movingColumn);
-
-  return nextColumns.map((column, index) => ({
-    ...column,
-    position: index,
-  }));
-}
-
-function moveCard(
-  listColumns: BoardListColumn[],
-  dragState: CardDragState,
-  targetColumnID: string,
-  rawTargetIndex: number
-): CardMoveResult {
-  const sourceColumn = listColumns.find((column) => column.columnID === dragState.sourceColumnID);
-  const targetColumn = listColumns.find((column) => column.columnID === targetColumnID);
-
-  if (!sourceColumn || !targetColumn) {
-    return {
-      listColumns,
-      changed: false,
-      finalIndex: dragState.sourceIndex,
-    };
-  }
-
-  if (dragState.sourceColumnID === targetColumnID) {
-    const cards = sourceColumn.cards.map((card) => ({ ...card }));
-    const sourceIndex = cards.findIndex((card) => card.cardID === dragState.cardID);
-    if (sourceIndex < 0) {
-      return {
-        listColumns,
-        changed: false,
-        finalIndex: dragState.sourceIndex,
-      };
-    }
-
-    const [movingCard] = cards.splice(sourceIndex, 1);
-    let targetIndex = rawTargetIndex;
-    if (sourceIndex < targetIndex) {
-      targetIndex -= 1;
-    }
-
-    if (targetIndex < 0) {
-      targetIndex = 0;
-    }
-    if (targetIndex > cards.length) {
-      targetIndex = cards.length;
-    }
-
-    if (targetIndex === sourceIndex) {
-      return {
-        listColumns,
-        changed: false,
-        finalIndex: dragState.sourceIndex,
-      };
-    }
-
-    cards.splice(targetIndex, 0, {
-      ...movingCard,
-      columnID: targetColumnID,
-    });
-
-    const nextColumns = listColumns.map((column) => {
-      if (column.columnID !== sourceColumn.columnID) {
-        return {
-          ...column,
-          cards: column.cards.map((card) => ({ ...card })),
-        };
-      }
-
-      return {
-        ...column,
-        cards: cards.map((card, index) => ({
-          ...card,
-          position: index,
-          columnID: targetColumnID,
-        })),
-      };
-    });
-
-    return {
-      listColumns: nextColumns,
-      changed: true,
-      finalIndex: targetIndex,
-    };
-  }
-
-  const sourceCards = sourceColumn.cards.map((card) => ({ ...card }));
-  const targetCards = targetColumn.cards.map((card) => ({ ...card }));
-  const sourceIndex = sourceCards.findIndex((card) => card.cardID === dragState.cardID);
-  if (sourceIndex < 0) {
-    return {
-      listColumns,
-      changed: false,
-      finalIndex: dragState.sourceIndex,
-    };
-  }
-
-  const [movingCard] = sourceCards.splice(sourceIndex, 1);
-  let targetIndex = rawTargetIndex;
-  if (targetIndex < 0) {
-    targetIndex = 0;
-  }
-  if (targetIndex > targetCards.length) {
-    targetIndex = targetCards.length;
-  }
-
-  targetCards.splice(targetIndex, 0, {
-    ...movingCard,
-    columnID: targetColumnID,
-  });
-
-  const nextColumns = listColumns.map((column) => {
-    if (column.columnID === sourceColumn.columnID) {
-      return {
-        ...column,
-        cards: sourceCards.map((card, index) => ({
-          ...card,
-          position: index,
-        })),
-      };
-    }
-
-    if (column.columnID === targetColumn.columnID) {
-      return {
-        ...column,
-        cards: targetCards.map((card, index) => ({
-          ...card,
-          position: index,
-          columnID: targetColumnID,
-        })),
-      };
-    }
-
-    return {
-      ...column,
-      cards: column.cards.map((card) => ({ ...card })),
-    };
-  });
-
-  return {
-    listColumns: nextColumns,
-    changed: true,
-    finalIndex: targetIndex,
-  };
 }
 
 export function useBoardWorkspace({
@@ -221,8 +34,6 @@ export function useBoardWorkspace({
   const [createColumnLoading, setCreateColumnLoading] = useState(false);
   const [cardTitles, setCardTitles] = useState<Record<string, string>>({});
   const [creatingCards, setCreatingCards] = useState<Record<string, boolean>>({});
-  const [columnDragState, setColumnDragState] = useState<ColumnDragState | null>(null);
-  const [cardDragState, setCardDragState] = useState<CardDragState | null>(null);
   const [editingColumnID, setEditingColumnID] = useState<string | null>(null);
   const [editColumnName, setEditColumnName] = useState("");
   const [savingColumnID, setSavingColumnID] = useState<string | null>(null);
@@ -231,30 +42,42 @@ export function useBoardWorkspace({
   const [editCardDescription, setEditCardDescription] = useState("");
   const [savingCardID, setSavingCardID] = useState<string | null>(null);
 
-  const orderedColumns = useMemo(
+  const baseOrderedColumns = useMemo(
     () => normalizeColumns(boardData?.listColumns ?? []),
     [boardData?.listColumns]
   );
 
+  const columnDrag = useColumnDrag({
+    canEditBoard,
+    editingColumnID,
+    editingCardID,
+    token,
+    boardData,
+    baseOrderedColumns,
+    setBoardData,
+    loadBoard,
+    onError: setBoardActionError,
+  });
+
+  const cardDrag = useCardDrag({
+    canEditBoard,
+    editingColumnID,
+    editingCardID,
+    token,
+    boardData,
+    baseOrderedColumns: columnDrag.orderedColumns,
+    setBoardData,
+    loadBoard,
+    onError: setBoardActionError,
+  });
+
   const setCardTitle = (columnID: string, value: string) => {
-    setCardTitles((current) => ({
-      ...current,
-      [columnID]: value,
-    }));
-  };
-
-  const clearColumnDragState = () => {
-    setColumnDragState(null);
-  };
-
-  const clearCardDragState = () => {
-    setCardDragState(null);
+    setCardTitles((current) => ({ ...current, [columnID]: value }));
   };
 
   const startEditingColumn = (columnID: string) => {
-    const column = orderedColumns.find((item) => item.columnID === columnID);
+    const column = cardDrag.orderedColumns.find((item) => item.columnID === columnID);
     if (!column) return;
-
     setBoardActionError("");
     setEditingColumnID(columnID);
     setEditColumnName(column.name);
@@ -266,18 +89,14 @@ export function useBoardWorkspace({
   };
 
   const findCardByColumn = (columnID: string, cardID: string) => {
-    const column = orderedColumns.find((item) => item.columnID === columnID);
+    const column = baseOrderedColumns.find((item) => item.columnID === columnID);
     return column?.cards.find((item) => item.cardID === cardID) ?? null;
   };
 
   const startEditingCard = (cardID: string, columnID: string) => {
-    if (editingCardID === cardID) {
-      return;
-    }
-
+    if (editingCardID === cardID) return;
     const card = findCardByColumn(columnID, cardID);
     if (!card) return;
-
     setBoardActionError("");
     setEditingCardID(cardID);
     setEditCardTitle(card.title);
@@ -291,33 +110,32 @@ export function useBoardWorkspace({
   };
 
   const getCardTitleValue = (columnID: string, cardID: string) => {
-    if (editingCardID === cardID) {
-      return editCardTitle;
-    }
-
+    if (editingCardID === cardID) return editCardTitle;
     return findCardByColumn(columnID, cardID)?.title ?? "";
   };
 
   const getCardDescriptionValue = (columnID: string, cardID: string) => {
-    if (editingCardID === cardID) {
-      return editCardDescription;
-    }
-
+    if (editingCardID === cardID) return editCardDescription;
     return findCardByColumn(columnID, cardID)?.description ?? "";
   };
 
   const isCardDirty = (columnID: string, cardID: string) => {
-    if (editingCardID !== cardID) {
-      return false;
-    }
-
+    if (editingCardID !== cardID) return false;
     const card = findCardByColumn(columnID, cardID);
-    if (!card) {
-      return false;
-    }
-
+    if (!card) return false;
     return editCardTitle !== card.title || editCardDescription !== card.description;
   };
+
+  // Coordinated drag start: clear the other drag type first
+  function handleColumnDragStart(columnID: string, startIndex: number, sourceHeight: number, sourceElement?: HTMLElement) {
+    cardDrag.clearCardDrag();
+    columnDrag.startColumnDrag(columnID, startIndex, sourceHeight, sourceElement);
+  }
+
+  function handleCardDragStart(cardID: string, sourceColumnID: string, sourceIndex: number, sourceElement?: HTMLElement) {
+    columnDrag.clearColumnDrag();
+    cardDrag.startCardDrag(cardID, sourceColumnID, sourceIndex, sourceElement);
+  }
 
   async function handleCreateListColumn(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -333,16 +151,9 @@ export function useBoardWorkspace({
       const createdColumn = await createListColumn(token, boardId, trimmedName);
       setBoardData((current) => {
         if (!current) return current;
-
         return {
           ...current,
-          listColumns: normalizeColumns([
-            ...current.listColumns,
-            {
-              ...createdColumn,
-              cards: [],
-            },
-          ]),
+          listColumns: normalizeColumns([...current.listColumns, { ...createdColumn, cards: [] }]),
         };
       });
       setNewColumnName("");
@@ -367,100 +178,21 @@ export function useBoardWorkspace({
       const createdCard = await createCard(token, columnID, title);
       setBoardData((current) => {
         if (!current) return current;
-
         return {
           ...current,
           listColumns: normalizeColumns(
             current.listColumns.map((column) => {
               if (column.columnID !== columnID) return column;
-              return {
-                ...column,
-                cards: [...column.cards, createdCard],
-              };
+              return { ...column, cards: [...column.cards, createdCard] };
             })
           ),
         };
       });
-
       setCardTitle(columnID, "");
     } catch (err) {
       setBoardActionError(err instanceof Error ? err.message : "Failed to create card");
     } finally {
       setCreatingCards((current) => ({ ...current, [columnID]: false }));
-    }
-  }
-
-  function handleColumnDragStart(columnID: string, startIndex: number) {
-    if (!canEditBoard) return;
-    if (editingColumnID || editingCardID) return;
-    setCardDragState(null);
-    setColumnDragState({ columnID, startIndex });
-  }
-
-  async function handleColumnDrop(targetIndex: number) {
-    const dragState = columnDragState;
-    if (!dragState || !boardData) return;
-
-    setColumnDragState(null);
-
-    if (dragState.startIndex === targetIndex) {
-      return;
-    }
-
-    const reorderedColumns = reorderColumns(boardData.listColumns, dragState.startIndex, targetIndex);
-    setBoardData((current) =>
-      current
-        ? {
-            ...current,
-            listColumns: reorderedColumns,
-          }
-        : current
-    );
-
-    if (!token) return;
-
-    try {
-      await updateListColumnPosition(token, dragState.columnID, targetIndex);
-    } catch (err) {
-      setBoardActionError(err instanceof Error ? err.message : "Failed to reorder list columns");
-      await loadBoard();
-    }
-  }
-
-  function handleCardDragStart(cardID: string, sourceColumnID: string, sourceIndex: number) {
-    if (!canEditBoard) return;
-    if (editingColumnID || editingCardID) return;
-    setColumnDragState(null);
-    setCardDragState({ cardID, sourceColumnID, sourceIndex });
-  }
-
-  async function handleCardDrop(targetColumnID: string, targetIndex: number) {
-    const dragState = cardDragState;
-    if (!dragState || !boardData) return;
-
-    setCardDragState(null);
-
-    const moveResult = moveCard(boardData.listColumns, dragState, targetColumnID, targetIndex);
-    if (!moveResult.changed) {
-      return;
-    }
-
-    setBoardData((current) =>
-      current
-        ? {
-            ...current,
-            listColumns: moveResult.listColumns,
-          }
-        : current
-    );
-
-    if (!token) return;
-
-    try {
-      await updateCardPosition(token, dragState.cardID, targetColumnID, moveResult.finalIndex);
-    } catch (err) {
-      setBoardActionError(err instanceof Error ? err.message : "Failed to reorder cards");
-      await loadBoard();
     }
   }
 
@@ -481,16 +213,10 @@ export function useBoardWorkspace({
       const updatedColumn = await updateListColumn(token, editingColumnID, trimmedName);
       setBoardData((current) => {
         if (!current) return current;
-
         return {
           ...current,
           listColumns: current.listColumns.map((column) =>
-            column.columnID === editingColumnID
-              ? {
-                  ...column,
-                  ...updatedColumn,
-                }
-              : column
+            column.columnID === editingColumnID ? { ...column, ...updatedColumn } : column
           ),
         };
       });
@@ -505,7 +231,7 @@ export function useBoardWorkspace({
   async function handleSaveCardEdit() {
     if (!token || !canEditBoard || !editingCardID) return;
 
-    const currentColumn = orderedColumns.find((column) =>
+    const currentColumn = baseOrderedColumns.find((column) =>
       column.cards.some((card) => card.cardID === editingCardID)
     );
     if (!currentColumn) return;
@@ -533,18 +259,12 @@ export function useBoardWorkspace({
       );
       setBoardData((current) => {
         if (!current) return current;
-
         return {
           ...current,
           listColumns: current.listColumns.map((column) => ({
             ...column,
             cards: column.cards.map((card) =>
-              card.cardID === editingCardID
-                ? {
-                    ...card,
-                    ...updatedCard,
-                  }
-                : card
+              card.cardID === editingCardID ? { ...card, ...updatedCard } : card
             ),
           })),
         };
@@ -564,22 +284,19 @@ export function useBoardWorkspace({
     createColumnLoading,
     cardTitles,
     creatingCards,
-    orderedColumns,
-    columnDragState,
-    cardDragState,
+    orderedColumns: cardDrag.orderedColumns,
+    columnDragState: columnDrag.columnDragState,
+    cardDragState: cardDrag.cardDragState,
     editingColumnID,
     editColumnName,
     savingColumnID,
     editingCardID,
-    editCardTitle,
-    editCardDescription,
     savingCardID,
     setCardTitle,
     setEditColumnName,
     setEditCardTitle,
     setEditCardDescription,
-    clearColumnDragState,
-    clearCardDragState,
+    clearColumnDragState: columnDrag.clearColumnDrag,
     startEditingColumn,
     cancelEditingColumn,
     startEditingCard,
@@ -590,9 +307,11 @@ export function useBoardWorkspace({
     handleCreateListColumn,
     handleCreateCard,
     handleColumnDragStart,
-    handleColumnDrop,
+    handleColumnDragHover: columnDrag.hoverColumn,
+    handleColumnDrop: columnDrag.dropColumn,
     handleCardDragStart,
-    handleCardDrop,
+    handleCardDragHover: cardDrag.hoverCard,
+    handleCardDrop: cardDrag.dropCard,
     handleSaveColumnEdit,
     handleSaveCardEdit,
   };
