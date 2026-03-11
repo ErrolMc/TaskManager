@@ -223,7 +223,7 @@ export default function BoardViewPage() {
   return (
     <div className="min-h-screen bg-background">
       <header className="border-b border-foreground/10">
-        <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between gap-4">
+        <div className="w-full px-6 py-4 flex items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             <button
               type="button"
@@ -253,7 +253,7 @@ export default function BoardViewPage() {
         </div>
       </header>
 
-      <main className="max-w-7xl mx-auto px-6 py-8 space-y-6">
+      <main className="w-full px-6 py-8 space-y-6">
         <section className="p-5 border border-foreground/10 rounded-xl">
           <div className="flex items-center justify-between mb-4">
             <h2 className="font-medium">Board Members</h2>
