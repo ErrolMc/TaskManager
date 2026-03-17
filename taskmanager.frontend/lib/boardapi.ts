@@ -222,6 +222,21 @@ export async function updateListColumn(
   return res.json();
 }
 
+export async function deleteListColumn(
+  token: string,
+  listColumnID: string
+): Promise<void> {
+  const res = await fetch(`${LIST_COLUMN_API_BASE}/delete`, {
+    method: "POST",
+    headers: getAuthHeaders(token),
+    body: JSON.stringify(listColumnID),
+  });
+
+  if (!res.ok) {
+    throw new Error(await getErrorMessage(res, "Failed to delete list column"));
+  }
+}
+
 export async function updateListColumnPosition(
   token: string,
   listColumnID: string,

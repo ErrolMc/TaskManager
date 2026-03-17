@@ -2,6 +2,7 @@ import { useMemo, useState, type Dispatch, type FormEvent, type SetStateAction }
 import {
   createCard,
   createListColumn,
+  deleteListColumn,
   updateCard,
   updateListColumn,
   type BoardDetailsResponse,
@@ -37,6 +38,7 @@ export function useBoardWorkspace({
   const [editingColumnID, setEditingColumnID] = useState<string | null>(null);
   const [editColumnName, setEditColumnName] = useState("");
   const [savingColumnID, setSavingColumnID] = useState<string | null>(null);
+  const [deletingColumnID, setDeletingColumnID] = useState<string | null>(null);
   const [editingCardID, setEditingCardID] = useState<string | null>(null);
   const [editCardTitle, setEditCardTitle] = useState("");
   const [editCardDescription, setEditCardDescription] = useState("");
@@ -228,6 +230,32 @@ export function useBoardWorkspace({
     }
   }
 
+  async function handleDeleteListColumn(columnID: string) {
+    if (!token || !canEditBoard) return;
+
+    setDeletingColumnID(columnID);
+    setBoardActionError("");
+
+    try {
+      await deleteListColumn(token, columnID);
+      setBoardData((current) => {
+        if (!current) return current;
+        return {
+          ...current,
+          listColumns: current.listColumns.filter((column) => column.columnID !== columnID),
+        };
+      });
+
+      if (editingColumnID === columnID) {
+        cancelEditingColumn();
+      }
+    } catch (err) {
+      setBoardActionError(err instanceof Error ? err.message : "Failed to delete list column");
+    } finally {
+      setDeletingColumnID(null);
+    }
+  }
+
   async function handleSaveCardEdit() {
     if (!token || !canEditBoard || !editingCardID) return;
 
@@ -290,6 +318,7 @@ export function useBoardWorkspace({
     editingColumnID,
     editColumnName,
     savingColumnID,
+    deletingColumnID,
     editingCardID,
     savingCardID,
     setCardTitle,
@@ -313,6 +342,7 @@ export function useBoardWorkspace({
     handleCardDragHover: cardDrag.hoverCard,
     handleCardDrop: cardDrag.dropCard,
     handleSaveColumnEdit,
+    handleDeleteListColumn,
     handleSaveCardEdit,
   };
 }

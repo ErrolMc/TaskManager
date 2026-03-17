@@ -14,6 +14,7 @@ var backend = builder.AddProject<Projects.TaskManager_Backend>("backend")
 var frontend = builder.AddJavaScriptApp("frontend", "../taskmanager.frontend")
     .WithNpm()
     .WithHttpEndpoint(env: "PORT")
+    .WaitFor(backend)
     .WithEnvironment("BACKEND_URL", backend.GetEndpoint("http"));
 
 backend.WithEnvironment("WEB_APP_URI", frontend.GetEndpoint("http"));

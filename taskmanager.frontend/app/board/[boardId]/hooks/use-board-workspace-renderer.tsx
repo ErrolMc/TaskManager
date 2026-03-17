@@ -18,6 +18,7 @@ interface UseBoardWorkspaceRendererParams {
   editingColumnID: string | null;
   editColumnName: string;
   savingColumnID: string | null;
+  deletingColumnID: string | null;
   editingCardID: string | null;
   savingCardID: string | null;
   onSetCardTitle: (columnID: string, value: string) => void;
@@ -30,6 +31,7 @@ interface UseBoardWorkspaceRendererParams {
   onStartEditingColumn: (columnID: string) => void;
   onCancelEditingColumn: () => void;
   onSaveColumnEdit: (e: FormEvent<HTMLFormElement>) => Promise<void>;
+  onDeleteListColumn: (columnID: string) => Promise<void>;
   onStartEditingCard: (cardID: string, columnID: string) => void;
   onCancelEditingCard: () => void;
   onSaveCardEdit: () => Promise<void>;
@@ -115,6 +117,7 @@ export function useBoardWorkspaceRenderer({
   editingColumnID,
   editColumnName,
   savingColumnID,
+  deletingColumnID,
   editingCardID,
   savingCardID,
   onSetCardTitle,
@@ -127,6 +130,7 @@ export function useBoardWorkspaceRenderer({
   onStartEditingColumn,
   onCancelEditingColumn,
   onSaveColumnEdit,
+  onDeleteListColumn,
   onStartEditingCard,
   onCancelEditingCard,
   onSaveCardEdit,
@@ -325,13 +329,31 @@ export function useBoardWorkspaceRenderer({
                             <h3 className="font-medium">{column.name}</h3>
                             <div className="flex items-center gap-2">
                               {canEditBoard && (
-                                <button
-                                  type="button"
-                                  onClick={() => onStartEditingColumn(column.columnID)}
-                                  className="text-xs px-2 py-1 border border-foreground/20 rounded-md hover:bg-foreground/5"
-                                >
-                                  Edit
-                                </button>
+                                <>
+                                  <button
+                                    type="button"
+                                    onClick={() => onStartEditingColumn(column.columnID)}
+                                    disabled={deletingColumnID === column.columnID}
+                                    className="text-xs px-2 py-1 border border-foreground/20 rounded-md hover:bg-foreground/5 disabled:opacity-50"
+                                  >
+                                    Edit
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      const confirmed = window.confirm(
+                                        `Delete column "${column.name}"? This cannot be undone.`
+                                      );
+                                      if (confirmed) {
+                                        void onDeleteListColumn(column.columnID);
+                                      }
+                                    }}
+                                    disabled={deletingColumnID === column.columnID}
+                                    className="text-xs px-2 py-1 border border-red-500/40 text-red-500 rounded-md hover:bg-red-500/10 disabled:opacity-50"
+                                  >
+                                    {deletingColumnID === column.columnID ? "Deleting..." : "Delete"}
+                                  </button>
+                                </>
                               )}
                             </div>
                           </>
