@@ -145,6 +145,8 @@ export function useBoardWorkspaceRenderer({
   onCardDrop,
 }: UseBoardWorkspaceRendererParams): ReactNode {
   const [focusedDescriptionCardID, setFocusedDescriptionCardID] = useState<string | null>(null);
+  const [overlayCardID, setOverlayCardID] = useState<string | null>(null);
+  const [overlayColumnID, setOverlayColumnID] = useState<string | null>(null);
 
   return useMemo(
     () => {
@@ -219,11 +221,11 @@ export function useBoardWorkspaceRenderer({
       });
 
       return (
-        <section className="p-5 border border-foreground/10 rounded-xl space-y-4">
+        <section className="p-5 bg-surface border border-border rounded-xl space-y-4">
           <div className="flex items-start justify-between gap-4 flex-wrap">
             <div>
               <h2 className="font-medium">Board Workspace</h2>
-              <p className="text-sm text-foreground/60">
+              <p className="text-sm text-muted">
                 Drag columns and cards to reorder. Drop cards into another column to move them.
               </p>
             </div>
@@ -235,13 +237,13 @@ export function useBoardWorkspaceRenderer({
                 onChange={(e) => setNewColumnName(e.target.value)}
                 placeholder="New list column"
                 disabled={!canEditBoard || createColumnLoading}
-                className="px-3 py-2 border border-foreground/20 rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-foreground/30 disabled:opacity-50"
+                className="px-3 py-2 border border-border-light rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-accent/50 disabled:opacity-50"
                 required
               />
               <button
                 type="submit"
                 disabled={!canEditBoard || createColumnLoading}
-                className="px-4 py-2 bg-foreground text-background rounded-lg font-medium hover:opacity-90 disabled:opacity-50 transition-opacity"
+                className="px-4 py-2 bg-accent text-white rounded-lg font-medium hover:bg-accent-hover disabled:opacity-50 transition-opacity"
               >
                 {createColumnLoading ? "Adding..." : "Add Column"}
               </button>
@@ -252,11 +254,11 @@ export function useBoardWorkspaceRenderer({
             <p className="text-sm text-red-500 bg-red-500/10 rounded-lg px-3 py-2">{boardActionError}</p>
           )}
 
-          {isLoading && <p className="text-sm text-foreground/60">Loading board...</p>}
+          {isLoading && <p className="text-sm text-muted">Loading board...</p>}
           {!isLoading && error && <p className="text-sm text-red-500">{error}</p>}
 
           {!isLoading && !error && orderedColumns.length === 0 && (
-            <p className="text-sm text-foreground/50">
+            <p className="text-sm text-muted">
               No list columns yet. {canEditBoard ? "Create your first list column." : "Ask an editor to add one."}
             </p>
           )}
@@ -275,7 +277,7 @@ export function useBoardWorkspaceRenderer({
                       <div
                         key={column.columnID}
                         {...columnContainerDragProps(column.columnID, columnIndex)}
-                        className="w-72 shrink-0 rounded-xl border border-foreground/20 bg-foreground/[0.10] relative"
+                        className="w-72 shrink-0 rounded-xl border border-border-light bg-surface-hover relative"
                         style={{ height: columnDragState.sourceHeight }}
                       >
                         {/* Handle stays in DOM (hidden) so the browser doesn't cancel the drag */}
@@ -291,7 +293,7 @@ export function useBoardWorkspaceRenderer({
                     <div
                       key={column.columnID}
                       {...columnContainerDragProps(column.columnID, columnIndex)}
-                      className="w-72 shrink-0 border border-foreground/10 rounded-xl p-3 bg-foreground/[0.02] space-y-3"
+                      className="w-72 shrink-0 border border-border rounded-xl p-3 bg-surface-alt space-y-3"
                     >
                       <div
                         {...columnDragHandle(column.columnID, columnIndex)}
@@ -305,13 +307,13 @@ export function useBoardWorkspaceRenderer({
                               type="text"
                               value={editColumnName}
                               onChange={(e) => onSetEditColumnName(e.target.value)}
-                              className="min-w-0 flex-1 px-2 py-1.5 text-sm border border-foreground/20 rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-foreground/30"
+                              className="min-w-0 flex-1 px-2 py-1.5 text-sm border border-border-light rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-accent/50"
                               required
                             />
                             <button
                               type="submit"
                               disabled={savingColumnID === column.columnID}
-                              className="text-xs px-2 py-1 border border-foreground/20 rounded-md hover:bg-foreground/5 disabled:opacity-50"
+                              className="text-xs px-2 py-1 border border-border-light rounded-md hover:bg-surface-hover disabled:opacity-50"
                             >
                               Save
                             </button>
@@ -319,7 +321,7 @@ export function useBoardWorkspaceRenderer({
                               type="button"
                               onClick={onCancelEditingColumn}
                               disabled={savingColumnID === column.columnID}
-                              className="text-xs px-2 py-1 border border-foreground/20 rounded-md hover:bg-foreground/5 disabled:opacity-50"
+                              className="text-xs px-2 py-1 border border-border-light rounded-md hover:bg-surface-hover disabled:opacity-50"
                             >
                               Cancel
                             </button>
@@ -334,7 +336,7 @@ export function useBoardWorkspaceRenderer({
                                     type="button"
                                     onClick={() => onStartEditingColumn(column.columnID)}
                                     disabled={deletingColumnID === column.columnID}
-                                    className="text-xs px-2 py-1 border border-foreground/20 rounded-md hover:bg-foreground/5 disabled:opacity-50"
+                                    className="text-xs px-2 py-1 border border-border-light rounded-md hover:bg-surface-hover disabled:opacity-50"
                                   >
                                     Edit
                                   </button>
@@ -360,37 +362,20 @@ export function useBoardWorkspaceRenderer({
                         )}
                       </div>
 
-                      <form onSubmit={(e) => void onCreateCard(e, column.columnID)} className="flex gap-2">
-                        <input
-                          type="text"
-                          value={cardTitles[column.columnID] ?? ""}
-                          onChange={(e) => onSetCardTitle(column.columnID, e.target.value)}
-                          placeholder="Add a card"
-                          disabled={!canEditBoard || creatingCards[column.columnID]}
-                          className="min-w-0 flex-1 px-2 py-1.5 text-sm border border-foreground/20 rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-foreground/30 disabled:opacity-50"
-                          required
-                        />
-                        <button
-                          type="submit"
-                          disabled={!canEditBoard || creatingCards[column.columnID]}
-                          className="px-2.5 py-1.5 text-sm bg-foreground text-background rounded-lg font-medium hover:opacity-90 disabled:opacity-50 transition-opacity"
-                        >
-                          +
-                        </button>
-                      </form>
-
                       <div className="space-y-2 min-h-10">
                         {orderedCards.length === 0 && (
-                          <p className="text-xs text-foreground/45 px-1 py-3">No cards yet.</p>
+                          <p className="text-xs text-muted/70 px-1 py-3">No cards yet.</p>
                         )}
 
                         {orderedCards.map((card, cardIndex) => {
+                          const hasDescription = card.description.trim().length > 0;
+
                           if (cardDragState?.cardID === card.cardID) {
                             return (
                               <div
                                 key={card.cardID}
                                 {...cardDropZone(column.columnID, card.cardID)}
-                                className="rounded-lg border border-foreground/20 bg-foreground/[0.10] min-h-36"
+                                className="rounded-lg border border-border-light bg-surface-hover h-10"
                               />
                             );
                           }
@@ -400,82 +385,39 @@ export function useBoardWorkspaceRenderer({
                               key={card.cardID}
                               {...cardDragSource(card.cardID, column.columnID, cardIndex)}
                               {...cardDropZone(column.columnID, card.cardID)}
-                              onBlurCapture={(e) => {
-                                if (editingCardID !== card.cardID) return;
-                                const nextFocused = e.relatedTarget as Node | null;
-                                if (!nextFocused || !e.currentTarget.contains(nextFocused)) {
-                                  onCancelEditingCard();
+                              onClick={() => {
+                                setOverlayCardID(card.cardID);
+                                setOverlayColumnID(column.columnID);
+                                if (canEditBoard) {
+                                  onStartEditingCard(card.cardID, column.columnID);
                                 }
                               }}
-                              className={`rounded-lg border border-foreground/15 bg-background p-3 space-y-2 min-h-36 ${
-                                canDragCard(card.cardID) ? "cursor-grab active:cursor-grabbing" : ""
-                              }`}
+                              className={`rounded-lg border border-border bg-surface-card px-3 py-2.5 ${
+                                canDragCard(card.cardID) ? "cursor-grab active:cursor-grabbing" : "cursor-pointer"
+                              } hover:border-border-light transition-colors`}
                             >
-                              <div>
-                                <input
-                                  type="text"
-                                  value={onGetCardTitleValue(column.columnID, card.cardID)}
-                                  readOnly={!canEditBoard}
-                                  onFocus={() => {
-                                    if (canEditBoard) {
-                                      onStartEditingCard(card.cardID, column.columnID);
-                                    }
-                                  }}
-                                  onChange={(e) => {
-                                    if (!canEditBoard) return;
-                                    if (editingCardID !== card.cardID) {
-                                      onStartEditingCard(card.cardID, column.columnID);
-                                    }
-                                    onSetEditCardTitle(e.target.value);
-                                  }}
-                                  className="w-full px-2 py-1.5 text-sm border border-foreground/20 rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-foreground/30 read-only:cursor-default"
-                                />
-                              </div>
-
-                              <div className="space-y-1">
-                                <p className="text-[11px] uppercase tracking-wide text-foreground/45">Description</p>
-                                <textarea
-                                  value={onGetCardDescriptionValue(column.columnID, card.cardID)}
-                                  readOnly={!canEditBoard}
-                                  spellCheck={focusedDescriptionCardID === card.cardID}
-                                  rows={4}
-                                  placeholder="Description"
-                                  onFocus={() => {
-                                    if (canEditBoard) {
-                                      onStartEditingCard(card.cardID, column.columnID);
-                                    }
-                                    setFocusedDescriptionCardID(card.cardID);
-                                  }}
-                                  onBlur={() => setFocusedDescriptionCardID(null)}
-                                  onChange={(e) => {
-                                    if (!canEditBoard) return;
-                                    if (editingCardID !== card.cardID) {
-                                      onStartEditingCard(card.cardID, column.columnID);
-                                    }
-                                    onSetEditCardDescription(e.target.value);
-                                  }}
-                                  className="w-full px-2 py-1.5 text-xs border border-foreground/20 rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-foreground/30 resize-none read-only:cursor-default"
-                                />
-                              </div>
-
-                              {canEditBoard && onIsCardDirty(column.columnID, card.cardID) && (
-                                <div className="flex items-center gap-2 pt-1">
-                                  <button
-                                    type="button"
-                                    onClick={() => void onSaveCardEdit()}
-                                    disabled={savingCardID === card.cardID}
-                                    className="text-xs px-2 py-1 border border-foreground/20 rounded-md hover:bg-foreground/5 disabled:opacity-50"
+                              <p className="text-sm font-medium truncate">
+                                {card.title}
+                              </p>
+                              {hasDescription && (
+                                <div
+                                  className="mt-1.5 ml-1 inline-flex items-center text-muted"
+                                  aria-label="Card has a description"
+                                  title="Has description"
+                                >
+                                  <svg
+                                    viewBox="0 0 16 16"
+                                    className="h-3.5 w-3.5"
+                                    aria-hidden="true"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    strokeWidth="1.6"
+                                    strokeLinecap="round"
                                   >
-                                    Save
-                                  </button>
-                                  <button
-                                    type="button"
-                                    onClick={onCancelEditingCard}
-                                    disabled={savingCardID === card.cardID}
-                                    className="text-xs px-2 py-1 border border-foreground/20 rounded-md hover:bg-foreground/5 disabled:opacity-50"
-                                  >
-                                    Cancel
-                                  </button>
+                                    <line x1="3" y1="4" x2="13" y2="4" />
+                                    <line x1="3" y1="8" x2="11" y2="8" />
+                                    <line x1="3" y1="12" x2="9" y2="12" />
+                                  </svg>
                                 </div>
                               )}
                             </div>
@@ -483,9 +425,118 @@ export function useBoardWorkspaceRenderer({
                         })}
 
                       </div>
+
+                      <form onSubmit={(e) => void onCreateCard(e, column.columnID)} className="flex gap-2">
+                        <input
+                          type="text"
+                          value={cardTitles[column.columnID] ?? ""}
+                          onChange={(e) => onSetCardTitle(column.columnID, e.target.value)}
+                          placeholder="Add a card"
+                          disabled={!canEditBoard || creatingCards[column.columnID]}
+                          className="min-w-0 flex-1 px-2 py-1.5 text-sm border border-border-light rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-accent/50 disabled:opacity-50"
+                          required
+                        />
+                        <button
+                          type="submit"
+                          disabled={!canEditBoard || creatingCards[column.columnID]}
+                          className="px-2.5 py-1.5 text-sm bg-accent text-white rounded-lg font-medium hover:bg-accent-hover disabled:opacity-50 transition-opacity"
+                        >
+                          +
+                        </button>
+                      </form>
                     </div>
                   );
                 })}
+              </div>
+            </div>
+          )}
+
+          {overlayCardID && overlayColumnID && (
+            <div
+              className="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
+              onClick={() => {
+                onCancelEditingCard();
+                setOverlayCardID(null);
+                setOverlayColumnID(null);
+              }}
+            >
+              <div
+                className="w-full max-w-lg bg-surface border border-border rounded-xl shadow-lg shadow-black/30 p-6 pt-4 space-y-2.5"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div className="flex items-start gap-3">
+                  <input
+                    type="text"
+                    value={onGetCardTitleValue(overlayColumnID, overlayCardID)}
+                    readOnly={!canEditBoard}
+                    onChange={(e) => {
+                      if (!canEditBoard) return;
+                      if (editingCardID !== overlayCardID) {
+                        onStartEditingCard(overlayCardID, overlayColumnID);
+                      }
+                      onSetEditCardTitle(e.target.value);
+                    }}
+                    className="-ml-2 min-w-0 flex-1 bg-transparent text-lg font-medium border border-transparent rounded-lg pl-3 pr-3 py-2 focus:outline-none focus:border-border-light focus:ring-2 focus:ring-accent/50"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onCancelEditingCard();
+                      setOverlayCardID(null);
+                      setOverlayColumnID(null);
+                    }}
+                    className="text-muted hover:text-foreground transition-colors text-xl leading-none px-1"
+                  >
+                    ✕
+                  </button>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-xs uppercase tracking-wide text-muted">Description</label>
+                  <textarea
+                    value={onGetCardDescriptionValue(overlayColumnID, overlayCardID)}
+                    readOnly={!canEditBoard}
+                    spellCheck={focusedDescriptionCardID === overlayCardID}
+                    rows={6}
+                    placeholder="Add a description..."
+                    onFocus={() => {
+                      if (canEditBoard && editingCardID !== overlayCardID) {
+                        onStartEditingCard(overlayCardID, overlayColumnID);
+                      }
+                      setFocusedDescriptionCardID(overlayCardID);
+                    }}
+                    onBlur={() => setFocusedDescriptionCardID(null)}
+                    onChange={(e) => {
+                      if (!canEditBoard) return;
+                      if (editingCardID !== overlayCardID) {
+                        onStartEditingCard(overlayCardID, overlayColumnID);
+                      }
+                      onSetEditCardDescription(e.target.value);
+                    }}
+                    className="w-full px-3 py-2 text-sm border border-border-light rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-accent/50 resize-none read-only:cursor-default"
+                  />
+                </div>
+
+                {canEditBoard && (
+                  <div className="flex items-center gap-2 pt-1">
+                    <button
+                      type="button"
+                      onClick={() => void onSaveCardEdit()}
+                      disabled={!onIsCardDirty(overlayColumnID, overlayCardID) || savingCardID === overlayCardID}
+                      className="px-4 py-2 bg-accent text-white rounded-lg font-medium hover:bg-accent-hover disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                    >
+                      Save
+                    </button>
+                    <button
+                      type="button"
+                      onClick={onCancelEditingCard}
+                      disabled={savingCardID === overlayCardID}
+                      className="px-4 py-2 border border-border-light rounded-lg hover:bg-surface-hover disabled:opacity-50 transition-colors"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
           )}
@@ -507,6 +558,8 @@ export function useBoardWorkspaceRenderer({
       focusedDescriptionCardID,
       isLoading,
       newColumnName,
+      overlayCardID,
+      overlayColumnID,
       onCancelEditingCard,
       onCancelEditingColumn,
       onCardDragHover,

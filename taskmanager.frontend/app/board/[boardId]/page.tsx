@@ -224,13 +224,13 @@ export default function BoardViewPage() {
 
   return (
     <div className="min-h-screen bg-background">
-      <header className="border-b border-foreground/10">
+      <header className="border-b border-border">
         <div className="w-full px-6 py-4 flex items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             <button
               type="button"
               onClick={() => router.push("/dashboard")}
-              className="text-sm px-3 py-1 border border-foreground/20 rounded-lg hover:bg-foreground/5 transition-colors"
+              className="text-sm px-3 py-1 border border-border-light rounded-lg hover:bg-surface-hover transition-colors"
             >
               Back
             </button>
@@ -238,7 +238,7 @@ export default function BoardViewPage() {
               <h1 className="text-xl font-bold">
                 {boardData?.boardInfo.boardName ?? "Board"}
               </h1>
-              <p className="text-sm text-foreground/60">
+              <p className="text-sm text-muted">
                 {currentUserRole === null ? "Role unavailable" : `Role: ${roleLabel(currentUserRole)}`}
               </p>
             </div>
@@ -248,7 +248,7 @@ export default function BoardViewPage() {
               logout();
               router.push("/login");
             }}
-            className="text-sm px-3 py-1 border border-foreground/20 rounded-lg hover:bg-foreground/5 transition-colors"
+            className="text-sm px-3 py-1 border border-border-light rounded-lg hover:bg-surface-hover transition-colors"
           >
             Sign Out
           </button>
@@ -256,7 +256,7 @@ export default function BoardViewPage() {
       </header>
 
       <main className="w-full px-6 py-8 space-y-6">
-        <section className="p-5 border border-foreground/10 rounded-xl">
+        <section className="p-5 bg-surface border border-border rounded-xl">
           <div className="flex items-center justify-between mb-4">
             <h2 className="font-medium">Board Members</h2>
             {canManageMembers && (
@@ -267,7 +267,7 @@ export default function BoardViewPage() {
                   setAddError("");
                   setAddSuccess("");
                 }}
-                className="text-sm px-3 py-1 border border-foreground/20 rounded-lg hover:bg-foreground/5 transition-colors"
+                className="text-sm px-3 py-1 border border-border-light rounded-lg hover:bg-surface-hover transition-colors"
               >
                 Add Member +
               </button>
@@ -275,7 +275,7 @@ export default function BoardViewPage() {
           </div>
 
           {showAddForm && (
-            <div className="mb-4 p-4 border border-foreground/10 rounded-lg space-y-3">
+            <div className="mb-4 p-4 bg-surface-hover/50 border border-border rounded-lg space-y-3">
               {addError && (
                 <p className="text-sm text-red-500 bg-red-500/10 rounded-lg px-3 py-2">{addError}</p>
               )}
@@ -288,13 +288,13 @@ export default function BoardViewPage() {
                   value={addUsername}
                   onChange={(e) => setAddUsername(e.target.value)}
                   placeholder="Username"
-                  className="flex-1 min-w-0 px-3 py-2 border border-foreground/20 rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-foreground/30"
+                  className="flex-1 min-w-0 px-3 py-2 border border-border-light rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-accent/50"
                   required
                 />
                 <select
                   value={addRole}
                   onChange={(e) => setAddRole(Number(e.target.value) as BoardRole)}
-                  className="px-3 py-2 border border-foreground/20 rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-foreground/30"
+                  className="px-3 py-2 border border-border-light rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-accent/50"
                 >
                   {ASSIGNABLE_ROLES.map((role) => (
                     <option key={role.value} value={role.value}>
@@ -305,7 +305,7 @@ export default function BoardViewPage() {
                 <button
                   type="submit"
                   disabled={addLoading}
-                  className="px-4 py-2 bg-foreground text-background rounded-lg font-medium hover:opacity-90 disabled:opacity-50 transition-opacity"
+                  className="px-4 py-2 bg-accent text-white rounded-lg font-medium hover:bg-accent-hover disabled:opacity-50 transition-opacity"
                 >
                   {addLoading ? "Adding..." : "Add"}
                 </button>
@@ -313,11 +313,11 @@ export default function BoardViewPage() {
             </div>
           )}
 
-          {isLoading && <p className="text-sm text-foreground/60">Loading board...</p>}
+          {isLoading && <p className="text-sm text-muted">Loading board...</p>}
           {!isLoading && error && <p className="text-sm text-red-500">{error}</p>}
 
           {!isLoading && !error && boardData?.members.length === 0 && (
-            <p className="text-sm text-foreground/50">No members in this board.</p>
+            <p className="text-sm text-muted">No members in this board.</p>
           )}
 
           {!isLoading && !error && boardData && boardData.members.length > 0 && (
@@ -327,9 +327,9 @@ export default function BoardViewPage() {
                   key={member.user.userID}
                   type="button"
                   onClick={(e) => handleMemberClick(e, member)}
-                  className={`px-3 py-1 text-sm border border-foreground/15 rounded-full transition-colors ${
+                  className={`px-3 py-1 text-sm border border-border rounded-full transition-colors ${
                     isOwner && member.role !== 0
-                      ? "hover:bg-foreground/10 cursor-pointer"
+                      ? "hover:bg-surface-hover cursor-pointer"
                       : "cursor-default"
                   }`}
                 >
@@ -347,9 +347,9 @@ export default function BoardViewPage() {
         <div
           ref={menuRef}
           style={{ position: "fixed", top: contextMenu.y, left: contextMenu.x, zIndex: 50 }}
-          className="min-w-44 bg-background border border-foreground/15 rounded-xl shadow-lg py-1 text-sm"
+          className="min-w-44 bg-surface border border-border rounded-xl shadow-lg shadow-black/20 py-1 text-sm"
         >
-          <p className="px-3 py-2 font-medium border-b border-foreground/10 text-foreground/60">
+          <p className="px-3 py-2 font-medium border-b border-border text-muted">
             {contextMenu.member.user.username}
           </p>
 
@@ -361,21 +361,21 @@ export default function BoardViewPage() {
             type="button"
             onClick={() => setChangeRoleOpen((current) => !current)}
             disabled={actionLoading}
-            className="w-full text-left px-3 py-2 hover:bg-foreground/5 transition-colors flex items-center justify-between"
+            className="w-full text-left px-3 py-2 hover:bg-surface-hover transition-colors flex items-center justify-between"
           >
             Change Role
-            <span className="text-foreground/40">{changeRoleOpen ? "▲" : "▼"}</span>
+            <span className="text-muted">{changeRoleOpen ? "▲" : "▼"}</span>
           </button>
 
           {changeRoleOpen && (
-            <div className="border-t border-foreground/10">
+            <div className="border-t border-border">
               {ASSIGNABLE_ROLES.map((role) => (
                 <button
                   key={role.value}
                   type="button"
                   disabled={actionLoading || contextMenu.member.role === role.value}
                   onClick={() => handleChangeRole(contextMenu.member, role.value)}
-                  className="w-full text-left px-5 py-1.5 hover:bg-foreground/5 transition-colors disabled:opacity-40"
+                  className="w-full text-left px-5 py-1.5 hover:bg-surface-hover transition-colors disabled:opacity-40"
                 >
                   {role.label}
                 </button>
@@ -387,7 +387,7 @@ export default function BoardViewPage() {
             type="button"
             disabled={actionLoading}
             onClick={() => handleRemoveMember(contextMenu.member)}
-            className="w-full text-left px-3 py-2 text-red-500 hover:bg-red-500/10 transition-colors border-t border-foreground/10"
+            className="w-full text-left px-3 py-2 text-red-500 hover:bg-red-500/10 transition-colors border-t border-border"
           >
             Remove Member
           </button>

@@ -66,11 +66,11 @@ export default function DashboardPage() {
 
   return (
     <div className="min-h-screen bg-background">
-      <header className="border-b border-foreground/10">
+      <header className="border-b border-border">
         <div className="w-full px-6 py-4 flex items-center justify-between">
           <h1 className="text-xl font-bold">Task Manager</h1>
           <div className="flex items-center gap-4">
-            <span className="text-sm text-foreground/60">
+            <span className="text-sm text-muted">
               {userID?.slice(0, 8)}...
             </span>
             <button
@@ -78,7 +78,7 @@ export default function DashboardPage() {
                 logout();
                 router.push("/login");
               }}
-              className="text-sm px-3 py-1 border border-foreground/20 rounded-lg hover:bg-foreground/5 transition-colors"
+              className="text-sm px-3 py-1 border border-border-light rounded-lg hover:bg-surface-hover transition-colors"
             >
               Sign Out
             </button>
@@ -90,12 +90,12 @@ export default function DashboardPage() {
         <div className="space-y-8">
           <div>
             <h2 className="text-2xl font-bold">Dashboard</h2>
-            <p className="text-foreground/60 mt-1">
+            <p className="text-muted mt-1">
               Create a board or open one you are already in.
             </p>
           </div>
 
-          <div className="p-6 border border-foreground/10 rounded-xl">
+          <div className="p-6 bg-surface border border-border rounded-xl">
             <h3 className="font-medium mb-4">Create New Board</h3>
 
             {createError && (
@@ -110,7 +110,7 @@ export default function DashboardPage() {
                 value={boardName}
                 onChange={(e) => setBoardName(e.target.value)}
                 placeholder="Board name"
-                className="w-full px-3 py-2 border border-foreground/20 rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-foreground/30"
+                className="w-full px-3 py-2 border border-border-light rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-accent/50"
                 required
               />
               <textarea
@@ -118,23 +118,23 @@ export default function DashboardPage() {
                 onChange={(e) => setBoardDescription(e.target.value)}
                 placeholder="Board description (optional)"
                 rows={3}
-                className="w-full px-3 py-2 border border-foreground/20 rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-foreground/30"
+                className="w-full px-3 py-2 border border-border-light rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-accent/50"
               />
               <button
                 type="submit"
                 disabled={createLoading}
-                className="px-4 py-2 bg-foreground text-background rounded-lg font-medium hover:opacity-90 disabled:opacity-50 transition-opacity"
+                className="px-4 py-2 bg-accent text-white rounded-lg font-medium hover:bg-accent-hover disabled:opacity-50 transition-opacity"
               >
                 {createLoading ? "Creating..." : "Create Board"}
               </button>
             </form>
           </div>
 
-          <div className="p-6 border border-foreground/10 rounded-xl">
+          <div className="p-6 bg-surface border border-border rounded-xl">
             <h3 className="font-medium mb-4">Your Boards</h3>
 
             {boardsLoading && (
-              <p className="text-foreground/60 text-sm">Loading boards...</p>
+              <p className="text-muted text-sm">Loading boards...</p>
             )}
 
             {!boardsLoading && boardsError && (
@@ -142,7 +142,7 @@ export default function DashboardPage() {
             )}
 
             {!boardsLoading && !boardsError && boards.length === 0 && (
-              <p className="text-foreground/40 text-sm">
+              <p className="text-muted text-sm">
                 You are not in any boards yet. Create one to get started.
               </p>
             )}
@@ -154,10 +154,10 @@ export default function DashboardPage() {
                     key={board.boardID}
                     type="button"
                     onClick={() => router.push(`/board/${board.boardID}`)}
-                    className="text-left p-4 border border-foreground/10 rounded-lg hover:bg-foreground/5 transition-colors"
+                    className="text-left p-4 border border-border rounded-lg bg-surface hover:bg-surface-hover transition-colors"
                   >
                     <p className="font-medium">{board.boardName}</p>
-                    <p className="text-sm text-foreground/60 mt-1">
+                    <p className="text-sm text-muted mt-1">
                       {board.description || "No description"}
                     </p>
                   </button>
