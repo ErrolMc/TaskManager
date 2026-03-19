@@ -5,6 +5,8 @@ using TaskManager.Backend.Contracts.Shared;
 using TaskManager.Backend.Models;
 using TaskManager.Backend.Models.Enums;
 using TaskManager.Backend.Repositories;
+using TaskManager.Backend.Services;
+using TaskManager.Backend.Contracts.Notifications;
 
 namespace TaskManager.Backend.Controllers
 {
@@ -17,17 +19,20 @@ namespace TaskManager.Backend.Controllers
         private readonly IBoardRepository _boardRepository;
         private readonly IBoardMemberRepository _boardMemberRepository;
         private readonly IListColumnRepository _listColumnRepository;
+        private readonly INotificationService _notificationService;
 
         public ListColumnController(
             ILogger<ListColumnController> logger,
             IBoardRepository boardRepository,
             IBoardMemberRepository boardMemberRepository,
-            IListColumnRepository listColumnRepository)
+            IListColumnRepository listColumnRepository,
+            INotificationService notificationService)
         {
             _logger = logger;
             _boardRepository = boardRepository;
             _boardMemberRepository = boardMemberRepository;
             _listColumnRepository = listColumnRepository;
+            _notificationService = notificationService;
         }
 
         [HttpPost("create")]
@@ -100,7 +105,8 @@ namespace TaskManager.Backend.Controllers
             if (listColumn == null)
                 return NotFound("List column not found");
 
-            BoardMember? currentUserMembership = await _boardMemberRepository.GetBoardMemberAsync(listColumn.BoardID, currentUserID);
+            string boardID = listColumn.BoardID;
+            BoardMember? currentUserMembership = await _boardMemberRepository.GetBoardMemberAsync(boardID, currentUserID);
             if (currentUserMembership == null)
                 return Forbid();
 
@@ -110,6 +116,25 @@ namespace TaskManager.Backend.Controllers
             bool listColumnDeleted = await _listColumnRepository.DeleteListColumnAsync(listColumnID);
             if (!listColumnDeleted)
                 return StatusCode(StatusCodes.Status500InternalServerError, "Failed to delete list column");
+
+            // send notification 
+            List<ListColumn> columnPositions = await _listColumnRepository.GetListColumnsForBoardAsync(boardID);
+
+            if (columnPositions != null)
+            {
+                bool sentNotification = await _notificationService.SendToBoardAsync(boardID,
+                    new ColumnDeletedNotification()
+                    {
+                        SenderUserID = currentUserID,
+                        BoardID = boardID,
+                        DeletedColumnID = listColumnID,
+                        ColumnsPositions = columnPositions.Select(c => new ItemPosition
+                        {
+                            Id = c.ColumnID,
+                            Position = c.Position
+                        }).ToList()
+                    });
+            }
 
             return Ok("List column deleted successfully");
         }
@@ -197,6 +222,14 @@ namespace TaskManager.Backend.Controllers
                 _logger.LogError("Failed to update position for list column {ListColumnID}", request.ListColumnID);
                 return StatusCode(StatusCodes.Status500InternalServerError, "Failed to update list column position");
             }
+
+            bool sentNotification = await _notificationService.SendToBoardAsync(listColumn.BoardID,
+                new ColumnMovedNotification()
+                {
+                    SenderUserID = currentUserID,
+                    BoardID = listColumn.BoardID,
+                    ColumnsPositions = updatedPositions
+                });
 
             return Ok(new UpdateListColumnPositionResponse
             {

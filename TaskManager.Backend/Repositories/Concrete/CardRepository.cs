@@ -47,6 +47,28 @@ namespace TaskManager.Backend.Repositories.Concrete
                 .FirstOrDefaultAsync(c => c.CardID == cardID);
         }
 
+        public async Task<bool> DeleteCardAsync(string cardID)
+        {
+            Card? card = await _context.Cards
+                .FirstOrDefaultAsync(c => c.CardID == cardID);
+
+            if (card == null)
+                return false;
+
+            string columnID = card.ColumnID;
+            _context.Cards.Remove(card);
+
+            List<Card> remainingCards = await _context.Cards
+                .Where(c => c.ColumnID == columnID)
+                .OrderBy(c => c.Position)
+                .ThenBy(c => c.CardID)
+                .ToListAsync();
+
+            ReassignSequentialPositions(remainingCards);
+
+            return await _context.SaveChangesAsync() > 0;
+        }
+
         public async Task<bool> UpdateCardAsync(string cardID, string title, string description)
         {
             Card? card = await _context.Cards

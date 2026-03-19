@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.IdentityModel.Tokens;
 using System.Text;
+using System.Text.Json;
 using TaskManager.Backend.Data;
 using TaskManager.Backend.Hubs;
 using TaskManager.Backend.Repositories;
@@ -25,7 +26,12 @@ namespace TaskManager.Backend
 
             services.AddControllers();
             services.AddOpenApi();
-            services.AddSignalR();
+            services.AddSignalR()
+                .AddJsonProtocol(options =>
+                {
+                    options.PayloadSerializerOptions.PropertyNamingPolicy = null;
+                    options.PayloadSerializerOptions.DictionaryKeyPolicy = null;
+                });
 
             services.AddScoped<IUserRepository, UserRepository>();
             services.AddScoped<IRefreshTokenRepository, RefreshTokenRepository>();

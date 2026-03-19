@@ -13,30 +13,40 @@ namespace TaskManager.Backend.Services.Concrete
             _notificationHubContext = notificationHubContext;
         }
 
-        public async Task SendToUserAsync(string userID, NotificationType notificationType, object payload)
+        public async Task JoinBoardGroupAsync(string connectionID, string boardID)
         {
-            ArgumentNullException.ThrowIfNull(payload);
+            if (string.IsNullOrWhiteSpace(connectionID))
+                throw new ArgumentException("Connection ID is required", nameof(connectionID));
 
-            if (string.IsNullOrWhiteSpace(userID))
-                throw new ArgumentException("User ID is required", nameof(userID));
-
-            await _notificationHubContext.Clients.User(userID).SendAsync(notificationType.ToString(), payload);
+            string boardGroupName = BuildBoardGroupName(boardID);
+            await _notificationHubContext.Groups.AddToGroupAsync(connectionID, boardGroupName);
         }
 
-        public async Task SendToUsersAsync(IEnumerable<string> userIDs, NotificationType notificationType, object payload)
+        public async Task LeaveBoardGroupAsync(string connectionID, string boardID)
         {
-            ArgumentNullException.ThrowIfNull(userIDs);
-            ArgumentNullException.ThrowIfNull(payload);
+            if (string.IsNullOrWhiteSpace(connectionID))
+                throw new ArgumentException("Connection ID is required", nameof(connectionID));
 
-            string[] targetUserIDs = userIDs
-                .Where(id => !string.IsNullOrWhiteSpace(id))
-                .Distinct()
-                .ToArray();
+            string boardGroupName = BuildBoardGroupName(boardID);
+            await _notificationHubContext.Groups.RemoveFromGroupAsync(connectionID, boardGroupName);
+        }
 
-            if (targetUserIDs.Length == 0)
-                throw new ArgumentException("At least one valid user ID is required", nameof(userIDs));
+        public async Task<bool> SendToBoardAsync(string boardID, Notification payload)
+        {
+            if (payload is null || string.IsNullOrWhiteSpace(boardID))
+                return false;
 
-            await _notificationHubContext.Clients.Users(targetUserIDs).SendAsync(notificationType.ToString(), payload);
+            string boardGroupName = BuildBoardGroupName(boardID);
+            await _notificationHubContext.Clients.Group(boardGroupName).SendAsync(payload.NotificationType.ToString(), payload);
+            return true;
+        }
+
+        private static string BuildBoardGroupName(string boardID)
+        {
+            if (string.IsNullOrWhiteSpace(boardID))
+                throw new ArgumentException("Board ID is required", nameof(boardID));
+
+            return $"board:{boardID.Trim()}";
         }
     }
 }

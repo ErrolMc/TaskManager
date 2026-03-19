@@ -293,6 +293,18 @@ export async function updateCard(
   return res.json();
 }
 
+export async function deleteCard(token: string, cardID: string): Promise<void> {
+  const res = await fetch(`${CARD_API_BASE}/delete`, {
+    method: "POST",
+    headers: getAuthHeaders(token),
+    body: JSON.stringify({ cardID }),
+  });
+
+  if (!res.ok) {
+    throw new Error(await getErrorMessage(res, "Failed to delete card"));
+  }
+}
+
 export async function updateCardPosition(
   token: string,
   cardID: string,

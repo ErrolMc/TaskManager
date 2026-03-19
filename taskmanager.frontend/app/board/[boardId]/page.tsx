@@ -10,8 +10,13 @@ import {
   changeUserRole,
   type BoardMember,
   type BoardDetailsResponse,
+  type BoardListColumn,
   type BoardRole,
 } from "@/lib/boardapi";
+import {
+  NotificationService,
+  type NotificationEventName,
+} from "@/lib/notification-service";
 import { useBoardWorkspace } from "./hooks/use-board-workspace";
 import { useBoardWorkspaceRenderer } from "./hooks/use-board-workspace-renderer";
 
@@ -40,6 +45,134 @@ interface ContextMenu {
   member: BoardMember;
   x: number;
   y: number;
+}
+
+interface NotificationItemPosition {
+  Id: string;
+  Position: number;
+}
+
+interface NotificationColumnArrangement {
+  ListColumnID: string;
+  CardsPositions: NotificationItemPosition[];
+}
+
+interface ColumnMovedNotificationPayload {
+  BoardID: string;
+  ColumnsPositions: NotificationItemPosition[];
+}
+
+interface ColumnDeletedNotificationPayload {
+  BoardID: string;
+  DeletedColumnID: string;
+  ColumnsPositions: NotificationItemPosition[];
+}
+
+interface CardMovedNotificationPayload {
+  BoardID: string;
+  CardID: string;
+  IsMovedWithinSameColumn: boolean;
+  SourceColumnArrangement: NotificationColumnArrangement;
+  TargetColumnArrangement?: NotificationColumnArrangement | null;
+}
+
+interface CardDeletedNotificationPayload {
+  BoardID: string;
+  CardID: string;
+  ColumnArrangement: NotificationColumnArrangement;
+}
+
+function sortColumnsByPosition(columns: BoardListColumn[]) {
+  return columns.slice().sort((a, b) => a.position - b.position);
+}
+
+function applyColumnPositions(
+  columns: BoardListColumn[],
+  positions: NotificationItemPosition[]
+) {
+  if (!positions.length) return columns;
+
+  const positionByID = new Map(positions.map((item) => [item.Id, item.Position]));
+  const updated = columns.map((column) => {
+    const nextPosition = positionByID.get(column.columnID);
+    if (nextPosition === undefined) return column;
+    return { ...column, position: nextPosition };
+  });
+
+  return sortColumnsByPosition(updated);
+}
+
+function applyCardArrangement(
+  columns: BoardListColumn[],
+  arrangement: NotificationColumnArrangement
+) {
+  const positionByCardID = new Map(
+    arrangement.CardsPositions.map((item) => [item.Id, item.Position])
+  );
+
+  return columns.map((column) => {
+    if (column.columnID !== arrangement.ListColumnID) return column;
+
+    const cards = column.cards.map((card) => {
+      const nextPosition = positionByCardID.get(card.cardID);
+      if (nextPosition === undefined) return card;
+      return { ...card, position: nextPosition };
+    });
+
+    return {
+      ...column,
+      cards: cards.slice().sort((a, b) => a.position - b.position),
+    };
+  });
+}
+
+function moveCardBetweenColumns(
+  columns: BoardListColumn[],
+  cardID: string,
+  sourceColumnID: string,
+  targetColumnID: string
+) {
+  let cardToMove: BoardListColumn["cards"][number] | null = null;
+
+  const withoutCard = columns.map((column) => {
+    if (column.columnID !== sourceColumnID) return column;
+
+    const cards = column.cards.filter((card) => {
+      if (card.cardID !== cardID) return true;
+      cardToMove = { ...card, columnID: targetColumnID };
+      return false;
+    });
+
+    return { ...column, cards };
+  });
+
+  if (!cardToMove) {
+    const found = columns
+      .flatMap((column) => column.cards)
+      .find((card) => card.cardID === cardID);
+    if (found) {
+      cardToMove = { ...found, columnID: targetColumnID };
+    }
+  }
+
+  if (!cardToMove) return withoutCard;
+
+  const movedCard = cardToMove;
+  return withoutCard.map((column) => {
+    if (column.columnID !== targetColumnID) return column;
+
+    const existingInTarget = column.cards.some((card) => card.cardID === cardID);
+    if (existingInTarget) {
+      return {
+        ...column,
+        cards: column.cards.map((card) =>
+          card.cardID === cardID ? { ...card, columnID: targetColumnID } : card
+        ),
+      };
+    }
+
+    return { ...column, cards: [...column.cards, movedCard] };
+  });
 }
 
 export default function BoardViewPage() {
@@ -84,6 +217,124 @@ export default function BoardViewPage() {
   useEffect(() => {
     void loadBoard();
   }, [loadBoard]);
+
+  useEffect(() => {
+    if (!isAuthenticated || !token || !userID || !boardId) return;
+
+    const notificationService = new NotificationService();
+    const unsubscribeHandlers: Array<() => void> = [];
+    const eventsToSubscribe: NotificationEventName[] = [
+      "CardMoved",
+      "ColumnMoved",
+      "ColumnDeleted",
+      "CardDeleted",
+    ];
+
+    const handleColumnMoved = (payload: unknown) => {
+      const data = payload as ColumnMovedNotificationPayload;
+      if (!data?.ColumnsPositions) return;
+
+      setBoardData((current) => {
+        if (!current) return current;
+        return {
+          ...current,
+          listColumns: applyColumnPositions(current.listColumns, data.ColumnsPositions),
+        };
+      });
+    };
+
+    const handleColumnDeleted = (payload: unknown) => {
+      const data = payload as ColumnDeletedNotificationPayload;
+      if (!data?.DeletedColumnID || !data.ColumnsPositions) return;
+
+      setBoardData((current) => {
+        if (!current) return current;
+        const columnsAfterDelete = current.listColumns.filter(
+          (column) => column.columnID !== data.DeletedColumnID
+        );
+        return {
+          ...current,
+          listColumns: applyColumnPositions(columnsAfterDelete, data.ColumnsPositions),
+        };
+      });
+    };
+
+    const handleCardDeleted = (payload: unknown) => {
+      const data = payload as CardDeletedNotificationPayload;
+      if (!data?.CardID || !data.ColumnArrangement) return;
+
+      setBoardData((current) => {
+        if (!current) return current;
+
+        const columnsWithoutCard = current.listColumns.map((column) => ({
+          ...column,
+          cards: column.cards.filter((card) => card.cardID !== data.CardID),
+        }));
+
+        return {
+          ...current,
+          listColumns: applyCardArrangement(columnsWithoutCard, data.ColumnArrangement),
+        };
+      });
+    };
+
+    const handleCardMoved = (payload: unknown) => {
+      const data = payload as CardMovedNotificationPayload;
+      if (!data?.CardID || !data.SourceColumnArrangement) return;
+
+      setBoardData((current) => {
+        if (!current) return current;
+
+        let nextColumns = current.listColumns;
+
+        if (!data.IsMovedWithinSameColumn && data.TargetColumnArrangement) {
+          nextColumns = moveCardBetweenColumns(
+            nextColumns,
+            data.CardID,
+            data.SourceColumnArrangement.ListColumnID,
+            data.TargetColumnArrangement.ListColumnID
+          );
+          nextColumns = applyCardArrangement(nextColumns, data.TargetColumnArrangement);
+        }
+
+        nextColumns = applyCardArrangement(nextColumns, data.SourceColumnArrangement);
+
+        return {
+          ...current,
+          listColumns: nextColumns,
+        };
+      });
+    };
+
+    for (const eventName of eventsToSubscribe) {
+      const handler =
+        eventName === "ColumnMoved"
+          ? handleColumnMoved
+          : eventName === "ColumnDeleted"
+            ? handleColumnDeleted
+            : eventName === "CardDeleted"
+              ? handleCardDeleted
+              : handleCardMoved;
+
+      const unsubscribe = notificationService.on(eventName, handler);
+      unsubscribeHandlers.push(unsubscribe);
+    }
+
+    void (async () => {
+      try {
+        await notificationService.start(token, userID);
+        await notificationService.openBoard(boardId);
+      } catch (err) {
+        console.error("Failed to start board notifications", err);
+      }
+    })();
+
+    return () => {
+      unsubscribeHandlers.forEach((unsubscribe) => unsubscribe());
+      void notificationService.closeBoard(boardId);
+      void notificationService.stop();
+    };
+  }, [isAuthenticated, token, userID, boardId]);
 
   // close context menu on outside click
   useEffect(() => {
@@ -137,6 +388,7 @@ export default function BoardViewPage() {
     deletingColumnID: boardWorkspace.deletingColumnID,
     editingCardID: boardWorkspace.editingCardID,
     savingCardID: boardWorkspace.savingCardID,
+    deletingCardID: boardWorkspace.deletingCardID,
     onSetCardTitle: boardWorkspace.setCardTitle,
     onSetEditColumnName: boardWorkspace.setEditColumnName,
     onSetEditCardTitle: boardWorkspace.setEditCardTitle,
@@ -151,6 +403,7 @@ export default function BoardViewPage() {
     onStartEditingCard: boardWorkspace.startEditingCard,
     onCancelEditingCard: boardWorkspace.cancelEditingCard,
     onSaveCardEdit: boardWorkspace.handleSaveCardEdit,
+    onDeleteCard: boardWorkspace.handleDeleteCard,
     onCreateListColumn: boardWorkspace.handleCreateListColumn,
     onCreateCard: boardWorkspace.handleCreateCard,
     onColumnDragStart: boardWorkspace.handleColumnDragStart,

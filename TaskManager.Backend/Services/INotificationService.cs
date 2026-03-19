@@ -4,7 +4,9 @@ namespace TaskManager.Backend.Services
 {
     public interface INotificationService
     {
-        public Task SendToUserAsync(string userID, NotificationType notificationType, object payload);
-        public Task SendToUsersAsync(IEnumerable<string> userIDs, NotificationType notificationType, object payload);
+        public Task JoinBoardGroupAsync(string connectionID, string boardID);
+        public Task LeaveBoardGroupAsync(string connectionID, string boardID);
+
+        public Task<bool> SendToBoardAsync(string boardID, Notification payload);
     }
 }

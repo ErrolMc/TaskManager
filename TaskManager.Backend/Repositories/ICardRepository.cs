@@ -9,6 +9,7 @@ namespace TaskManager.Backend.Repositories
         public Task<List<Card>> GetCardsForBoardAsync(string boardID);
         public Task<int> GetNextPositionForColumnAsync(string columnID);
         public Task<Card?> GetCardByIdAsync(string cardID);
+        public Task<bool> DeleteCardAsync(string cardID);
         public Task<bool> UpdateCardAsync(string cardID, string title, string description);
         public Task<List<ColumnArrangement>?> UpdateCardPositionAsync(string cardID, string listColumnID, int position);
     }

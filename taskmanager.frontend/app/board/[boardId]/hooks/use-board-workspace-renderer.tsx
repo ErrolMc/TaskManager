@@ -21,6 +21,7 @@ interface UseBoardWorkspaceRendererParams {
   deletingColumnID: string | null;
   editingCardID: string | null;
   savingCardID: string | null;
+  deletingCardID: string | null;
   onSetCardTitle: (columnID: string, value: string) => void;
   onSetEditColumnName: (value: string) => void;
   onSetEditCardTitle: (value: string) => void;
@@ -35,6 +36,7 @@ interface UseBoardWorkspaceRendererParams {
   onStartEditingCard: (cardID: string, columnID: string) => void;
   onCancelEditingCard: () => void;
   onSaveCardEdit: () => Promise<void>;
+  onDeleteCard: (cardID: string) => Promise<boolean>;
   onCreateListColumn: (e: FormEvent<HTMLFormElement>) => Promise<void>;
   onCreateCard: (e: FormEvent<HTMLFormElement>, columnID: string) => Promise<void>;
   onColumnDragStart: (columnID: string, startIndex: number, sourceHeight: number, sourceElement: HTMLElement) => void;
@@ -120,6 +122,7 @@ export function useBoardWorkspaceRenderer({
   deletingColumnID,
   editingCardID,
   savingCardID,
+  deletingCardID,
   onSetCardTitle,
   onSetEditColumnName,
   onSetEditCardTitle,
@@ -134,6 +137,7 @@ export function useBoardWorkspaceRenderer({
   onStartEditingCard,
   onCancelEditingCard,
   onSaveCardEdit,
+  onDeleteCard,
   onCreateListColumn,
   onCreateCard,
   onColumnDragStart,
@@ -518,23 +522,46 @@ export function useBoardWorkspaceRenderer({
                 </div>
 
                 {canEditBoard && (
-                  <div className="flex items-center gap-2 pt-1">
-                    <button
-                      type="button"
-                      onClick={() => void onSaveCardEdit()}
-                      disabled={!onIsCardDirty(overlayColumnID, overlayCardID) || savingCardID === overlayCardID}
-                      className="px-4 py-2 bg-accent text-white rounded-lg font-medium hover:bg-accent-hover disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                    >
-                      Save
-                    </button>
-                    <button
-                      type="button"
-                      onClick={onCancelEditingCard}
-                      disabled={savingCardID === overlayCardID}
-                      className="px-4 py-2 border border-border-light rounded-lg hover:bg-surface-hover disabled:opacity-50 transition-colors"
-                    >
-                      Cancel
-                    </button>
+                  <div className="space-y-2 pt-1">
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => void onSaveCardEdit()}
+                        disabled={!onIsCardDirty(overlayColumnID, overlayCardID) || savingCardID === overlayCardID}
+                        className="px-4 py-2 bg-accent text-white rounded-lg font-medium hover:bg-accent-hover disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                      >
+                        Save
+                      </button>
+                      <button
+                        type="button"
+                        onClick={onCancelEditingCard}
+                        disabled={savingCardID === overlayCardID}
+                        className="px-4 py-2 border border-border-light rounded-lg hover:bg-surface-hover disabled:opacity-50 transition-colors"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+
+                    <div className="border-t border-border pt-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const confirmed = window.confirm("Delete this card? This cannot be undone.");
+                          if (!confirmed) return;
+
+                          void onDeleteCard(overlayCardID).then((deleted) => {
+                            if (deleted) {
+                              setOverlayCardID(null);
+                              setOverlayColumnID(null);
+                            }
+                          });
+                        }}
+                        disabled={savingCardID === overlayCardID || deletingCardID === overlayCardID}
+                        className="w-full px-4 py-2 border border-red-500/40 text-red-500 rounded-lg hover:bg-red-500/10 disabled:opacity-50 transition-colors"
+                      >
+                        {deletingCardID === overlayCardID ? "Deleting..." : "Delete Card"}
+                      </button>
+                    </div>
                   </div>
                 )}
               </div>
@@ -585,7 +612,9 @@ export function useBoardWorkspaceRenderer({
       orderedColumns,
       savingCardID,
       savingColumnID,
+      deletingCardID,
       setNewColumnName,
+      onDeleteCard,
     ]
   );
 }

@@ -2,6 +2,7 @@ import { useMemo, useState, type Dispatch, type FormEvent, type SetStateAction }
 import {
   createCard,
   createListColumn,
+  deleteCard,
   deleteListColumn,
   updateCard,
   updateListColumn,
@@ -43,6 +44,7 @@ export function useBoardWorkspace({
   const [editCardTitle, setEditCardTitle] = useState("");
   const [editCardDescription, setEditCardDescription] = useState("");
   const [savingCardID, setSavingCardID] = useState<string | null>(null);
+  const [deletingCardID, setDeletingCardID] = useState<string | null>(null);
 
   const baseOrderedColumns = useMemo(
     () => normalizeColumns(boardData?.listColumns ?? []),
@@ -305,6 +307,38 @@ export function useBoardWorkspace({
     }
   }
 
+  async function handleDeleteCard(cardID: string) {
+    if (!token || !canEditBoard) return false;
+
+    setDeletingCardID(cardID);
+    setBoardActionError("");
+
+    try {
+      await deleteCard(token, cardID);
+      setBoardData((current) => {
+        if (!current) return current;
+        return {
+          ...current,
+          listColumns: current.listColumns.map((column) => ({
+            ...column,
+            cards: column.cards.filter((card) => card.cardID !== cardID),
+          })),
+        };
+      });
+
+      if (editingCardID === cardID) {
+        cancelEditingCard();
+      }
+
+      return true;
+    } catch (err) {
+      setBoardActionError(err instanceof Error ? err.message : "Failed to delete card");
+      return false;
+    } finally {
+      setDeletingCardID(null);
+    }
+  }
+
   return {
     boardActionError,
     newColumnName,
@@ -321,6 +355,7 @@ export function useBoardWorkspace({
     deletingColumnID,
     editingCardID,
     savingCardID,
+    deletingCardID,
     setCardTitle,
     setEditColumnName,
     setEditCardTitle,
@@ -344,5 +379,6 @@ export function useBoardWorkspace({
     handleSaveColumnEdit,
     handleDeleteListColumn,
     handleSaveCardEdit,
+    handleDeleteCard,
   };
 }
