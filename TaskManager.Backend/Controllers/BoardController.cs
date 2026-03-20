@@ -336,6 +336,40 @@ namespace TaskManager.Backend.Controllers
             return Ok(response);
         }
 
+        [HttpGet("getboardmembers")]
+        [ProducesResponseType<List<BoardMemberDTO>>(StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+        [ProducesResponseType(StatusCodes.Status403Forbidden)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        public async Task<IActionResult> GetBoardMembers([FromQuery] GetBoardInfoRequest request)
+        {
+            if (string.IsNullOrWhiteSpace(request.BoardID))
+                return BadRequest("Board ID is required");
+
+            string? currentUserID = GetCurrentUserID();
+            if (string.IsNullOrWhiteSpace(currentUserID))
+                return Unauthorized("Unable to resolve authenticated user");
+
+            Board? board = await _boardRepository.GetBoardByIdAsync(request.BoardID);
+            if (board == null)
+                return NotFound("Board not found");
+
+            BoardMember? currentUserMembership = await _boardMemberRepository.GetBoardMemberAsync(request.BoardID, currentUserID);
+            if (currentUserMembership == null)
+                return Forbid();
+
+            List<BoardMember> members = await _boardMemberRepository.GetBoardMembersAsync(request.BoardID);
+
+            var response = members.Select(m => new BoardMemberDTO
+            {
+                User = m.User.AsUserDTO(),
+                Role = m.Role
+            }).ToList();
+
+            return Ok(response);
+        }
+
         [HttpGet("getboardsforcurrentuser")]
         [ProducesResponseType<List<BoardInfoDTO>>(StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status401Unauthorized)]

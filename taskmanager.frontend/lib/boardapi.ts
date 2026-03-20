@@ -136,6 +136,23 @@ export async function getBoardInfo(
   return res.json();
 }
 
+export async function getBoardMembers(
+  token: string,
+  boardID: string
+): Promise<BoardMember[]> {
+  const searchParams = new URLSearchParams({ boardID });
+  const res = await fetch(`${API_BASE}/getboardmembers?${searchParams.toString()}`, {
+    method: "GET",
+    headers: getAuthHeaders(token),
+  });
+
+  if (!res.ok) {
+    throw new Error(await getErrorMessage(res, "Failed to fetch board members"));
+  }
+
+  return res.json();
+}
+
 export async function addUserToBoard(
   token: string,
   boardID: string,

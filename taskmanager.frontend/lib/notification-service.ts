@@ -15,11 +15,14 @@ export type NotificationEventName =
   | "ColumnEdited"
   | "CardEdited"
   | "ColumnCreated"
-  | "CardCreated";
+  | "CardCreated"
+  | "BoardJoined"
+  | "BoardLeft";
 
 interface BaseNotificationPayload {
   SenderUserID?: string;
   BoardID?: string;
+  UserID?: string;
 }
 
 type NotificationHandler = (payload: unknown) => void;
@@ -33,6 +36,8 @@ const NOTIFICATION_EVENTS: NotificationEventName[] = [
   "CardEdited",
   "ColumnCreated",
   "CardCreated",
+  "BoardJoined",
+  "BoardLeft",
 ];
 
 function buildHubUrl() {
@@ -132,7 +137,7 @@ export class NotificationService {
   private registerEventHandlers(connection: HubConnection) {
     for (const eventName of NOTIFICATION_EVENTS) {
       connection.on(eventName, (payload: unknown) => {
-        if (!this.shouldApplyPayload(payload)) return;
+        if (!this.shouldApplyPayload(eventName, payload)) return;
 
         const listeners = this.handlers.get(eventName);
         if (!listeners) return;
@@ -142,12 +147,31 @@ export class NotificationService {
     }
   }
 
-  private shouldApplyPayload(payload: unknown) {
+  private shouldApplyPayload(eventName: NotificationEventName, payload: unknown) {
     if (!payload || typeof payload !== "object") return false;
 
     const typedPayload = payload as BaseNotificationPayload;
-    if (!typedPayload.BoardID || !this.activeBoardID) return false;
-    if (typedPayload.BoardID !== this.activeBoardID) return false;
+    const isBoardMembershipEvent =
+      eventName === "BoardJoined" || eventName === "BoardLeft";
+
+    if (isBoardMembershipEvent) {
+      const isForCurrentUser = Boolean(
+        typedPayload.UserID &&
+          this.currentUserID &&
+          typedPayload.UserID === this.currentUserID
+      );
+
+      const isForActiveBoard = Boolean(
+        typedPayload.BoardID &&
+          this.activeBoardID &&
+          typedPayload.BoardID === this.activeBoardID
+      );
+
+      if (!isForCurrentUser && !isForActiveBoard) return false;
+    } else {
+      if (!typedPayload.BoardID || !this.activeBoardID) return false;
+      if (typedPayload.BoardID !== this.activeBoardID) return false;
+    }
 
     if (typedPayload.SenderUserID && this.currentUserID) {
       return typedPayload.SenderUserID !== this.currentUserID;

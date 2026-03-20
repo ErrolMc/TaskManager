@@ -4,6 +4,11 @@ import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
 import { createBoard, getBoardsForCurrentUser, type BoardInfo } from "@/lib/boardapi";
+import { NotificationService } from "@/lib/notification-service";
+
+interface BoardMembershipNotificationPayload {
+  UserID: string;
+}
 
 export default function DashboardPage() {
   const { isAuthenticated, userID, token, logout } = useAuth();
@@ -42,6 +47,40 @@ export default function DashboardPage() {
     if (!isAuthenticated || !token) return;
     loadBoards();
   }, [isAuthenticated, token, loadBoards]);
+
+  useEffect(() => {
+    if (!isAuthenticated || !token || !userID) return;
+
+    const notificationService = new NotificationService();
+    const handleBoardMembershipChanged = (payload: unknown) => {
+      const data = payload as BoardMembershipNotificationPayload;
+      if (!data?.UserID || data.UserID !== userID) return;
+      void loadBoards();
+    };
+
+    const unsubscribeBoardJoined = notificationService.on(
+      "BoardJoined",
+      handleBoardMembershipChanged
+    );
+    const unsubscribeBoardLeft = notificationService.on(
+      "BoardLeft",
+      handleBoardMembershipChanged
+    );
+
+    void (async () => {
+      try {
+        await notificationService.start(token, userID);
+      } catch (err) {
+        console.error("Failed to start dashboard notifications", err);
+      }
+    })();
+
+    return () => {
+      unsubscribeBoardJoined();
+      unsubscribeBoardLeft();
+      void notificationService.stop();
+    };
+  }, [isAuthenticated, token, userID, loadBoards]);
 
   async function handleCreateBoard(e: React.FormEvent) {
     e.preventDefault();

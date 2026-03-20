@@ -5,6 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
 import {
   getBoardInfo,
+  getBoardMembers,
   addUserToBoard,
   removeUserFromBoard,
   changeUserRole,
@@ -107,6 +108,11 @@ interface CardCreatedNotificationPayload {
   CardID: string;
   Title: string;
   Description: string;
+}
+
+interface BoardMembershipNotificationPayload {
+  BoardID: string;
+  UserID: string;
 }
 
 function sortColumnsByPosition(columns: BoardListColumn[]) {
@@ -261,6 +267,23 @@ export default function BoardViewPage() {
     }
   }, [isAuthenticated, token, boardId]);
 
+  const loadBoardMembers = useCallback(async () => {
+    if (!isAuthenticated || !token || !boardId) return;
+
+    try {
+      const members = await getBoardMembers(token, boardId);
+      setBoardData((current) => {
+        if (!current) return current;
+        return {
+          ...current,
+          members,
+        };
+      });
+    } catch (err) {
+      console.error("Failed to refresh board members", err);
+    }
+  }, [isAuthenticated, token, boardId]);
+
   useEffect(() => {
     void loadBoard();
   }, [loadBoard]);
@@ -279,6 +302,8 @@ export default function BoardViewPage() {
       "CardEdited",
       "ColumnCreated",
       "CardCreated",
+      "BoardJoined",
+      "BoardLeft",
     ];
 
     const handleColumnMoved = (payload: unknown) => {
@@ -482,6 +507,27 @@ export default function BoardViewPage() {
       });
     };
 
+    const handleBoardJoined = (payload: unknown) => {
+      const data = payload as BoardMembershipNotificationPayload;
+      if (!data?.BoardID || !data.UserID) return;
+
+      if (data.UserID === userID) return;
+
+      void loadBoardMembers();
+    };
+
+    const handleBoardLeft = (payload: unknown) => {
+      const data = payload as BoardMembershipNotificationPayload;
+      if (!data?.BoardID || !data.UserID) return;
+
+      if (data.UserID === userID) {
+        router.push("/dashboard");
+        return;
+      }
+
+      void loadBoardMembers();
+    };
+
     for (const eventName of eventsToSubscribe) {
       const handler =
         eventName === "ColumnMoved"
@@ -498,6 +544,10 @@ export default function BoardViewPage() {
                     ? handleColumnCreated
                     : eventName === "CardCreated"
                       ? handleCardCreated
+                      : eventName === "BoardJoined"
+                        ? handleBoardJoined
+                        : eventName === "BoardLeft"
+                          ? handleBoardLeft
                       : handleCardMoved;
 
       const unsubscribe = notificationService.on(eventName, handler);
@@ -518,7 +568,7 @@ export default function BoardViewPage() {
       void notificationService.closeBoard(boardId);
       void notificationService.stop();
     };
-  }, [isAuthenticated, token, userID, boardId]);
+  }, [isAuthenticated, token, userID, boardId, loadBoardMembers, router]);
 
   // close context menu on outside click
   useEffect(() => {
@@ -615,7 +665,7 @@ export default function BoardViewPage() {
     try {
       await removeUserFromBoard(token, boardId, member.user.userID);
       setContextMenu(null);
-      await loadBoard();
+      await loadBoardMembers();
     } catch (err) {
       setActionError(err instanceof Error ? err.message : "Failed to remove member");
     } finally {
@@ -631,7 +681,7 @@ export default function BoardViewPage() {
       await changeUserRole(token, boardId, member.user.userID, newRole);
       setContextMenu(null);
       setChangeRoleOpen(false);
-      await loadBoard();
+      await loadBoardMembers();
     } catch (err) {
       setActionError(err instanceof Error ? err.message : "Failed to change role");
     } finally {
@@ -649,7 +699,7 @@ export default function BoardViewPage() {
       await addUserToBoard(token, boardId, addUsername.trim(), addRole);
       setAddSuccess(`${addUsername.trim()} added successfully.`);
       setAddUsername("");
-      await loadBoard();
+      await loadBoardMembers();
     } catch (err) {
       setAddError(err instanceof Error ? err.message : "Failed to add member");
     } finally {
