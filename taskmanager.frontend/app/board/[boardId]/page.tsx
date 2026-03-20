@@ -101,6 +101,14 @@ interface ColumnCreatedNotificationPayload {
   Title: string;
 }
 
+interface CardCreatedNotificationPayload {
+  BoardID: string;
+  ColumnID: string;
+  CardID: string;
+  Title: string;
+  Description: string;
+}
+
 function sortColumnsByPosition(columns: BoardListColumn[]) {
   return columns.slice().sort((a, b) => a.position - b.position);
 }
@@ -250,6 +258,7 @@ export default function BoardViewPage() {
       "ColumnEdited",
       "CardEdited",
       "ColumnCreated",
+      "CardCreated",
     ];
 
     const handleColumnMoved = (payload: unknown) => {
@@ -410,6 +419,49 @@ export default function BoardViewPage() {
       });
     };
 
+    const handleCardCreated = (payload: unknown) => {
+      const data = payload as CardCreatedNotificationPayload;
+      if (!data?.CardID || !data.ColumnID || !data.Title) return;
+
+      setBoardData((current) => {
+        if (!current) return current;
+
+        const alreadyExists = current.listColumns.some((column) =>
+          column.cards.some((card) => card.cardID === data.CardID)
+        );
+        if (alreadyExists) return current;
+
+        return {
+          ...current,
+          listColumns: current.listColumns.map((column) => {
+            if (column.columnID !== data.ColumnID) return column;
+
+            const nextPosition =
+              column.cards.length > 0
+                ? Math.max(...column.cards.map((card) => card.position)) + 1
+                : 0;
+
+            return {
+              ...column,
+              cards: [
+                ...column.cards,
+                {
+                  cardID: data.CardID,
+                  columnID: data.ColumnID,
+                  title: data.Title,
+                  description: data.Description ?? "",
+                  position: nextPosition,
+                  dueAtUTC: "0001-01-01T00:00:00",
+                  createdByUserID: "",
+                  isArchived: false,
+                },
+              ],
+            };
+          }),
+        };
+      });
+    };
+
     for (const eventName of eventsToSubscribe) {
       const handler =
         eventName === "ColumnMoved"
@@ -424,7 +476,9 @@ export default function BoardViewPage() {
                   ? handleCardEdited
                   : eventName === "ColumnCreated"
                     ? handleColumnCreated
-                    : handleCardMoved;
+                    : eventName === "CardCreated"
+                      ? handleCardCreated
+                      : handleCardMoved;
 
       const unsubscribe = notificationService.on(eventName, handler);
       unsubscribeHandlers.push(unsubscribe);

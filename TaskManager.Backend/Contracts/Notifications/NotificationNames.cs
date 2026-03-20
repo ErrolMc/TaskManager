@@ -10,5 +10,6 @@
         ColumnEdited = 5,
         CardEdited = 6,
         ColumnCreated = 7,
+        CardCreated = 8,
     }
 }

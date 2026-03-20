@@ -14,7 +14,8 @@ export type NotificationEventName =
   | "CardDeleted"
   | "ColumnEdited"
   | "CardEdited"
-  | "ColumnCreated";
+  | "ColumnCreated"
+  | "CardCreated";
 
 interface BaseNotificationPayload {
   SenderUserID?: string;
@@ -31,6 +32,7 @@ const NOTIFICATION_EVENTS: NotificationEventName[] = [
   "ColumnEdited",
   "CardEdited",
   "ColumnCreated",
+  "CardCreated",
 ];
 
 function buildHubUrl() {

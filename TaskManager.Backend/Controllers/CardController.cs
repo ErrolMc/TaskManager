@@ -83,6 +83,17 @@ namespace TaskManager.Backend.Controllers
             if (!cardCreated)
                 return StatusCode(StatusCodes.Status500InternalServerError, "Failed to create card");
 
+            bool sentNotification = await _notificationService.SendToBoardAsync(listColumn.BoardID,
+                new CardCreatedNotification
+                {
+                    SenderUserID = currentUserID,
+                    BoardID = listColumn.BoardID,
+                    ColumnID = card.ColumnID,
+                    CardID = card.CardID,
+                    Title = card.Title,
+                    Description = card.Description
+                });
+
             return Ok(card);
         }
 
