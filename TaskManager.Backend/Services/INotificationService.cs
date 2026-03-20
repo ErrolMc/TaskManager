@@ -8,5 +8,6 @@ namespace TaskManager.Backend.Services
         public Task LeaveBoardGroupAsync(string connectionID, string boardID);
 
         public Task<bool> SendToBoardAsync(string boardID, Notification payload);
+        public Task<bool> SendToUserAsync(string userID, Notification payload);
     }
 }

@@ -41,6 +41,15 @@ namespace TaskManager.Backend.Services.Concrete
             return true;
         }
 
+        public async Task<bool> SendToUserAsync(string userID, Notification payload)
+        {
+            if (payload is null || string.IsNullOrWhiteSpace(userID))
+                return false;
+
+            await _notificationHubContext.Clients.User(userID.Trim()).SendAsync(payload.NotificationType.ToString(), payload);
+            return true;
+        }
+
         private static string BuildBoardGroupName(string boardID)
         {
             if (string.IsNullOrWhiteSpace(boardID))

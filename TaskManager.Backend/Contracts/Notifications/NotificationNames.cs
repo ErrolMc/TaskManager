@@ -11,5 +11,8 @@
         CardEdited = 6,
         ColumnCreated = 7,
         CardCreated = 8,
+        BoardJoined = 9,
+        BoardLeft = 10,
+        BoardDeleted = 11,
     }
 }

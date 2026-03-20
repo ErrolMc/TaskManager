@@ -3,10 +3,12 @@ using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using TaskManager.Backend.Contracts.Api.Boards;
+using TaskManager.Backend.Contracts.Notifications;
 using TaskManager.Backend.Models;
 using TaskManager.Backend.Models.DTOs;
 using TaskManager.Backend.Models.Enums;
 using TaskManager.Backend.Repositories;
+using TaskManager.Backend.Services;
 
 namespace TaskManager.Backend.Controllers
 {
@@ -21,6 +23,7 @@ namespace TaskManager.Backend.Controllers
         private readonly IListColumnRepository _listColumnRepository;
         private readonly ICardRepository _cardRepository;
         private readonly IUserRepository _userRepository;
+        private readonly INotificationService _notificationService;
 
         public BoardController(
             ILogger<BoardController> logger,
@@ -28,7 +31,8 @@ namespace TaskManager.Backend.Controllers
             IBoardMemberRepository boardMemberRepository,
             IListColumnRepository listColumnRepository,
             ICardRepository cardRepository,
-            IUserRepository userRepository)
+            IUserRepository userRepository,
+            INotificationService notificationService)
         {
             _logger = logger;
             _boardRepository = boardRepository;
@@ -36,6 +40,7 @@ namespace TaskManager.Backend.Controllers
             _listColumnRepository = listColumnRepository;
             _cardRepository = cardRepository;
             _userRepository = userRepository;
+            _notificationService = notificationService;
         }
 
         [HttpPost("create")]
@@ -186,6 +191,17 @@ namespace TaskManager.Backend.Controllers
             if (!boardMemberCreated)
                 return StatusCode(StatusCodes.Status500InternalServerError, "Failed to add user to board");
 
+            // send notification to user and the board
+            Notification notification = new BoardJoinedNotification
+            {
+                SenderUserID = currentUserID,
+                BoardID = request.BoardID,
+                UserID = userToAdd.UserID
+            };
+
+            bool sentNotification = await _notificationService.SendToUserAsync(userToAdd.UserID, notification);
+            sentNotification = await _notificationService.SendToBoardAsync(request.BoardID, notification);
+
             return Ok("User added to board successfully");
         }
 
@@ -231,6 +247,17 @@ namespace TaskManager.Backend.Controllers
             bool boardMemberDeleted = await _boardMemberRepository.DeleteBoardMemberAsync(request.BoardID, request.UserID);
             if (!boardMemberDeleted)
                 return StatusCode(StatusCodes.Status500InternalServerError, "Failed to remove user from board");
+
+            // send notification to user and the board
+            Notification notification = new BoardLeftNotification
+            {
+                SenderUserID = currentUserID,
+                BoardID = request.BoardID,
+                UserID = request.UserID
+            };
+
+            bool sentNotification = await _notificationService.SendToUserAsync(request.UserID, notification);
+            sentNotification = await _notificationService.SendToBoardAsync(request.BoardID, notification);
 
             return Ok("User removed from board successfully");
         }
