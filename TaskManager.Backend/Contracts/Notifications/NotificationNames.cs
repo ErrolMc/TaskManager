@@ -7,5 +7,6 @@
         ColumnMoved = 2,
         ColumnDeleted = 3,
         CardDeleted = 4,
+        ColumnEdited = 5,
     }
 }

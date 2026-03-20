@@ -35,7 +35,7 @@ namespace TaskManager.Backend.Hubs
             if (membership == null)
                 throw new HubException("Forbidden");
 
-            HashSet<string> joinedBoards = GetOrCreateJoinedBoards();
+            HashSet<string> joinedBoards = GetOrCreateJoinedBoardsForCurrentConnection();
             if (joinedBoards.Add(trimmedBoardID))
             {
                 await _notificationService.JoinBoardGroupAsync(Context.ConnectionId, trimmedBoardID);
@@ -48,7 +48,7 @@ namespace TaskManager.Backend.Hubs
                 throw new HubException("Board ID is required");
 
             string trimmedBoardID = boardID.Trim();
-            HashSet<string> joinedBoards = GetOrCreateJoinedBoards();
+            HashSet<string> joinedBoards = GetOrCreateJoinedBoardsForCurrentConnection();
 
             if (joinedBoards.Remove(trimmedBoardID))
             {
@@ -58,7 +58,7 @@ namespace TaskManager.Backend.Hubs
 
         public override async Task OnDisconnectedAsync(Exception? exception)
         {
-            HashSet<string> joinedBoards = GetOrCreateJoinedBoards();
+            HashSet<string> joinedBoards = GetOrCreateJoinedBoardsForCurrentConnection();
             foreach (string boardID in joinedBoards)
             {
                 await _notificationService.LeaveBoardGroupAsync(Context.ConnectionId, boardID);
@@ -76,7 +76,7 @@ namespace TaskManager.Backend.Hubs
                 ?? Context.UserIdentifier;
         }
 
-        private HashSet<string> GetOrCreateJoinedBoards()
+        private HashSet<string> GetOrCreateJoinedBoardsForCurrentConnection()
         {
             if (Context.Items.TryGetValue(JoinedBoardsKey, out var value)
                 && value is HashSet<string> existing)

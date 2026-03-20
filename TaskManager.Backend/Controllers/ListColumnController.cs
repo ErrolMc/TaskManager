@@ -183,6 +183,15 @@ namespace TaskManager.Backend.Controllers
             if (updatedListColumn == null)
                 return StatusCode(StatusCodes.Status500InternalServerError, "Failed to retrieve updated list column");
 
+            bool sentNotification = await _notificationService.SendToBoardAsync(updatedListColumn.BoardID,
+                new ColumnEditedNotification
+                {
+                    SenderUserID = currentUserID,
+                    BoardId = updatedListColumn.BoardID,
+                    ColumnId = updatedListColumn.ColumnID,
+                    Title = updatedListColumn.Name
+                });
+
             return Ok(updatedListColumn);
         }
 

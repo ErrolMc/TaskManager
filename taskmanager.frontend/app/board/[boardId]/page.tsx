@@ -82,6 +82,12 @@ interface CardDeletedNotificationPayload {
   ColumnArrangement: NotificationColumnArrangement;
 }
 
+interface ColumnEditedNotificationPayload {
+  BoardId: string;
+  ColumnId: string;
+  Title: string;
+}
+
 function sortColumnsByPosition(columns: BoardListColumn[]) {
   return columns.slice().sort((a, b) => a.position - b.position);
 }
@@ -228,6 +234,7 @@ export default function BoardViewPage() {
       "ColumnMoved",
       "ColumnDeleted",
       "CardDeleted",
+      "ColumnEdited",
     ];
 
     const handleColumnMoved = (payload: unknown) => {
@@ -306,6 +313,27 @@ export default function BoardViewPage() {
       });
     };
 
+    const handleColumnEdited = (payload: unknown) => {
+      const data = payload as ColumnEditedNotificationPayload;
+      if (!data?.ColumnId || !data.Title) return;
+
+      setBoardData((current) => {
+        if (!current) return current;
+
+        return {
+          ...current,
+          listColumns: current.listColumns.map((column) =>
+            column.columnID === data.ColumnId
+              ? {
+                  ...column,
+                  name: data.Title,
+                }
+              : column
+          ),
+        };
+      });
+    };
+
     for (const eventName of eventsToSubscribe) {
       const handler =
         eventName === "ColumnMoved"
@@ -314,7 +342,9 @@ export default function BoardViewPage() {
             ? handleColumnDeleted
             : eventName === "CardDeleted"
               ? handleCardDeleted
-              : handleCardMoved;
+              : eventName === "ColumnEdited"
+                ? handleColumnEdited
+                : handleCardMoved;
 
       const unsubscribe = notificationService.on(eventName, handler);
       unsubscribeHandlers.push(unsubscribe);
