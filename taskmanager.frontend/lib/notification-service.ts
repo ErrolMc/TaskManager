@@ -12,12 +12,12 @@ export type NotificationEventName =
   | "ColumnMoved"
   | "ColumnDeleted"
   | "CardDeleted"
-  | "ColumnEdited";
+  | "ColumnEdited"
+  | "CardEdited";
 
 interface BaseNotificationPayload {
   SenderUserID?: string;
   BoardID?: string;
-  BoardId?: string;
 }
 
 type NotificationHandler = (payload: unknown) => void;
@@ -28,6 +28,7 @@ const NOTIFICATION_EVENTS: NotificationEventName[] = [
   "ColumnDeleted",
   "CardDeleted",
   "ColumnEdited",
+  "CardEdited",
 ];
 
 function buildHubUrl() {
@@ -141,9 +142,8 @@ export class NotificationService {
     if (!payload || typeof payload !== "object") return false;
 
     const typedPayload = payload as BaseNotificationPayload;
-    const payloadBoardID = typedPayload.BoardID ?? typedPayload.BoardId;
-    if (!payloadBoardID || !this.activeBoardID) return false;
-    if (payloadBoardID !== this.activeBoardID) return false;
+    if (!typedPayload.BoardID || !this.activeBoardID) return false;
+    if (typedPayload.BoardID !== this.activeBoardID) return false;
 
     if (typedPayload.SenderUserID && this.currentUserID) {
       return typedPayload.SenderUserID !== this.currentUserID;

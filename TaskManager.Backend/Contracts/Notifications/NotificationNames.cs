@@ -8,5 +8,6 @@
         ColumnDeleted = 3,
         CardDeleted = 4,
         ColumnEdited = 5,
+        CardEdited = 6,
     }
 }

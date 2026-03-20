@@ -187,7 +187,7 @@ namespace TaskManager.Backend.Controllers
                 new ColumnEditedNotification
                 {
                     SenderUserID = currentUserID,
-                    BoardId = updatedListColumn.BoardID,
+                    BoardID = updatedListColumn.BoardID,
                     ColumnId = updatedListColumn.ColumnID,
                     Title = updatedListColumn.Name
                 });

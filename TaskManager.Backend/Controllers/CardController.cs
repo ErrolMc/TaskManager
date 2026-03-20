@@ -135,6 +135,16 @@ namespace TaskManager.Backend.Controllers
             if (updatedCard == null)
                 return StatusCode(StatusCodes.Status500InternalServerError, "Failed to retrieve updated card");
 
+            bool sentNotification = await _notificationService.SendToBoardAsync(listColumn.BoardID,
+                new CardEditedNotification
+                {
+                    SenderUserID = currentUserID,
+                    BoardID = listColumn.BoardID,
+                    CardID = updatedCard.CardID,
+                    Title = updatedCard.Title,
+                    Description = updatedCard.Description
+                });
+
             return Ok(updatedCard);
         }
 
