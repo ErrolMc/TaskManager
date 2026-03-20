@@ -1,4 +1,4 @@
-import { useMemo, useState, type DragEvent, type FormEvent, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type DragEvent, type FormEvent, type ReactNode } from "react";
 import type { BoardListColumn } from "@/lib/boardapi";
 import type { CardDragState, ColumnDragState } from "./drag-utils";
 
@@ -151,6 +151,29 @@ export function useBoardWorkspaceRenderer({
   const [focusedDescriptionCardID, setFocusedDescriptionCardID] = useState<string | null>(null);
   const [overlayCardID, setOverlayCardID] = useState<string | null>(null);
   const [overlayColumnID, setOverlayColumnID] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!overlayCardID) return;
+
+    let containingColumnID: string | null = null;
+    for (const column of orderedColumns) {
+      if (column.cards.some((card) => card.cardID === overlayCardID)) {
+        containingColumnID = column.columnID;
+        break;
+      }
+    }
+
+    if (!containingColumnID) {
+      onCancelEditingCard();
+      setOverlayCardID(null);
+      setOverlayColumnID(null);
+      return;
+    }
+
+    if (overlayColumnID !== containingColumnID) {
+      setOverlayColumnID(containingColumnID);
+    }
+  }, [orderedColumns, overlayCardID, overlayColumnID, onCancelEditingCard]);
 
   return useMemo(
     () => {
