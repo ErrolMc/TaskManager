@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type DragEvent, type FormEvent, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type DragEvent, type FormEvent, type ReactNode } from "react";
 import type { BoardListColumn } from "@/lib/boardapi";
 import type { CardDragState, ColumnDragState } from "./drag-utils";
 
@@ -151,6 +151,9 @@ export function useBoardWorkspaceRenderer({
   const [focusedDescriptionCardID, setFocusedDescriptionCardID] = useState<string | null>(null);
   const [overlayCardID, setOverlayCardID] = useState<string | null>(null);
   const [overlayColumnID, setOverlayColumnID] = useState<string | null>(null);
+  const [isAddListOpen, setIsAddListOpen] = useState(false);
+  const addListContainerRef = useRef<HTMLDivElement | null>(null);
+  const wasCreateColumnLoadingRef = useRef(false);
 
   useEffect(() => {
     if (!overlayCardID) return;
@@ -174,6 +177,38 @@ export function useBoardWorkspaceRenderer({
       setOverlayColumnID(containingColumnID);
     }
   }, [orderedColumns, overlayCardID, overlayColumnID, onCancelEditingCard]);
+
+  useEffect(() => {
+    if (!isAddListOpen) return;
+
+    function handleClickOutsideAddList(event: MouseEvent) {
+      if (!addListContainerRef.current) return;
+      if (addListContainerRef.current.contains(event.target as Node)) return;
+
+      setIsAddListOpen(false);
+      setNewColumnName("");
+    }
+
+    document.addEventListener("mousedown", handleClickOutsideAddList);
+
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutsideAddList);
+    };
+  }, [isAddListOpen, setNewColumnName]);
+
+  useEffect(() => {
+    if (createColumnLoading) {
+      wasCreateColumnLoadingRef.current = true;
+      return;
+    }
+
+    if (!wasCreateColumnLoadingRef.current) return;
+    wasCreateColumnLoadingRef.current = false;
+
+    if (newColumnName.trim() === "") {
+      setIsAddListOpen(false);
+    }
+  }, [createColumnLoading, newColumnName]);
 
   return useMemo(
     () => {
@@ -249,32 +284,13 @@ export function useBoardWorkspaceRenderer({
 
       return (
         <section className="p-5 bg-surface border border-border rounded-xl space-y-4">
-          <div className="flex items-start justify-between gap-4 flex-wrap">
+          <div>
             <div>
               <h2 className="font-medium">Board Workspace</h2>
               <p className="text-sm text-muted">
                 Drag columns and cards to reorder. Drop cards into another column to move them.
               </p>
             </div>
-
-            <form onSubmit={(e) => void onCreateListColumn(e)} className="flex gap-2">
-              <input
-                type="text"
-                value={newColumnName}
-                onChange={(e) => setNewColumnName(e.target.value)}
-                placeholder="New list column"
-                disabled={!canEditBoard || createColumnLoading}
-                className="px-3 py-2 border border-border-light rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-accent/50 disabled:opacity-50"
-                required
-              />
-              <button
-                type="submit"
-                disabled={!canEditBoard || createColumnLoading}
-                className="px-4 py-2 bg-accent text-white rounded-lg font-medium hover:bg-accent-hover disabled:opacity-50 transition-opacity"
-              >
-                {createColumnLoading ? "Adding..." : "Add Column"}
-              </button>
-            </form>
           </div>
 
           {boardActionError && (
@@ -284,13 +300,13 @@ export function useBoardWorkspaceRenderer({
           {isLoading && <p className="text-sm text-muted">Loading board...</p>}
           {!isLoading && error && <p className="text-sm text-red-500">{error}</p>}
 
-          {!isLoading && !error && orderedColumns.length === 0 && (
+          {!isLoading && !error && orderedColumns.length === 0 && !canEditBoard && (
             <p className="text-sm text-muted">
               No list columns yet. {canEditBoard ? "Create your first list column." : "Ask an editor to add one."}
             </p>
           )}
 
-          {!isLoading && !error && orderedColumns.length > 0 && (
+          {!isLoading && !error && (orderedColumns.length > 0 || canEditBoard) && (
             <div className="overflow-x-auto pb-2">
               <div className="flex items-start gap-4 min-h-60">
                 {orderedColumns.map((column, columnIndex) => {
@@ -474,6 +490,59 @@ export function useBoardWorkspaceRenderer({
                     </div>
                   );
                 })}
+
+                {canEditBoard && (
+                  <div
+                    ref={addListContainerRef}
+                    className="w-72 shrink-0 rounded-xl border border-border-light bg-surface-hover/70 p-3"
+                  >
+                    {!isAddListOpen ? (
+                      <button
+                        type="button"
+                        onClick={() => setIsAddListOpen(true)}
+                        className="w-full flex items-center gap-2 px-1 py-1.5 text-sm text-muted hover:text-foreground transition-colors"
+                      >
+                        <span className="text-base leading-none">+</span>
+                        <span>Add another list</span>
+                      </button>
+                    ) : (
+                      <form
+                        onSubmit={(e) => void onCreateListColumn(e)}
+                        className="space-y-2"
+                      >
+                        <input
+                          type="text"
+                          value={newColumnName}
+                          onChange={(e) => setNewColumnName(e.target.value)}
+                          placeholder="List title"
+                          disabled={!canEditBoard || createColumnLoading}
+                          className="w-full px-3 py-2 text-sm border border-border-light rounded-lg bg-background/95 focus:outline-none focus:ring-2 focus:ring-accent/50 disabled:opacity-50"
+                          required
+                        />
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="submit"
+                            disabled={!canEditBoard || createColumnLoading}
+                            className="flex-1 px-3 py-2 text-sm bg-accent text-white rounded-lg font-medium hover:bg-accent-hover disabled:opacity-50 transition-opacity"
+                          >
+                            {createColumnLoading ? "Adding..." : "Add List"}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setIsAddListOpen(false);
+                              setNewColumnName("");
+                            }}
+                            disabled={createColumnLoading}
+                            className="px-3 py-2 text-sm border border-border-light rounded-lg hover:bg-surface-hover disabled:opacity-50"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      </form>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
           )}
@@ -607,6 +676,7 @@ export function useBoardWorkspaceRenderer({
       error,
       focusedDescriptionCardID,
       isLoading,
+      isAddListOpen,
       newColumnName,
       overlayCardID,
       overlayColumnID,
