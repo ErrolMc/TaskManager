@@ -82,6 +82,15 @@ namespace TaskManager.Backend.Controllers
             if (!listColumnCreated)
                 return StatusCode(StatusCodes.Status500InternalServerError, "Failed to create list column");
 
+            bool sentNotification = await _notificationService.SendToBoardAsync(listColumn.BoardID,
+                new ColumnCreatedNotification
+                {
+                    SenderUserID = currentUserID,
+                    BoardID = listColumn.BoardID,
+                    ColumnID = listColumn.ColumnID,
+                    Title = listColumn.Name
+                });
+
             return Ok(listColumn);
         }
 
