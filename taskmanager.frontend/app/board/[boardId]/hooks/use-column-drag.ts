@@ -100,10 +100,14 @@ export function useColumnDrag({
     }
   }
 
-  async function dropColumn() {
+  async function dropColumn(targetColumnID?: string, insertAfter?: boolean) {
     if (dropCommittedRef.current) return;
     const state = columnDragState;
-    const target = hoverTargetRef.current;
+    const target =
+      hoverTargetRef.current ??
+      (state && targetColumnID
+        ? { index: resolveHoverIndex(targetColumnID, insertAfter) }
+        : null);
     if (!state || !target) return;
     dropCommittedRef.current = true;
     await commitDrop(state, target);

@@ -42,7 +42,7 @@ interface UseBoardWorkspaceRendererParams {
   onColumnDragStart: (columnID: string, startIndex: number, sourceHeight: number, sourceElement: HTMLElement) => void;
   onColumnDragEnd: () => void;
   onColumnDragHover: (targetColumnID: string, insertAfter: boolean) => void;
-  onColumnDrop: () => Promise<void>;
+  onColumnDrop: (targetColumnID?: string, insertAfter?: boolean) => Promise<void>;
   onCardDragStart: (cardID: string, sourceColumnID: string, sourceIndex: number, sourceElement: HTMLElement) => void;
   onCardDragHover: (targetColumnID: string, targetCardID?: string, insertAfter?: boolean) => void;
   onCardDrop: (targetColumnID: string, targetCardID?: string) => Promise<void>;
@@ -50,6 +50,9 @@ interface UseBoardWorkspaceRendererParams {
 
 function setColumnDragImage(event: DragEvent<HTMLDivElement>) {
   if (!event.dataTransfer) return;
+
+  event.dataTransfer.setData("text/plain", "column");
+  event.dataTransfer.effectAllowed = "move";
 
   const handle = event.currentTarget;
   const columnEl = handle.parentElement;
@@ -80,6 +83,9 @@ function setColumnDragImage(event: DragEvent<HTMLDivElement>) {
 
 function setCardDragImage(event: DragEvent<HTMLDivElement>) {
   if (!event.dataTransfer) return;
+
+  event.dataTransfer.setData("text/plain", "card");
+  event.dataTransfer.effectAllowed = "move";
 
   const sourceCard = event.currentTarget;
   const rect = sourceCard.getBoundingClientRect();
@@ -223,21 +229,26 @@ export function useBoardWorkspaceRenderer({
         onDragOver: (e: DragEvent<HTMLDivElement>) => {
           if (columnDragState) {
             e.preventDefault();
+            if (e.dataTransfer) e.dataTransfer.dropEffect = "move";
             const rect = e.currentTarget.getBoundingClientRect();
             const insertAfter = e.clientX > rect.left + rect.width / 2;
             onColumnDragHover(columnID, insertAfter);
           }
           if (cardDragState) {
             e.preventDefault();
+            if (e.dataTransfer) e.dataTransfer.dropEffect = "move";
             onCardDragHover(columnID);
           }
         },
         onDrop: (e: DragEvent<HTMLDivElement>) => {
-          console.log("[renderer] column onDrop:", { columnID, columnIndex, hasColumnDrag: !!columnDragState, hasCardDrag: !!cardDragState });
           e.preventDefault();
-          if (columnDragState) { void onColumnDrop(); return; }
+          if (columnDragState) {
+            const rect = e.currentTarget.getBoundingClientRect();
+            const insertAfter = e.clientX > rect.left + rect.width / 2;
+            void onColumnDrop(columnID, insertAfter);
+            return;
+          }
           if (cardDragState) void onCardDrop(columnID);
-          else console.warn("[renderer] column onDrop: no drag state to handle!");
         },
       });
 
@@ -250,7 +261,9 @@ export function useBoardWorkspaceRenderer({
           const height = columnEl?.getBoundingClientRect().height ?? 0;
           onColumnDragStart(columnID, columnIndex, height, e.currentTarget);
         },
-        onDragEnd: onColumnDragEnd,
+        // Finalization is handled by native dragend listener in use-column-drag.
+        // Avoid clearing state early here (Safari can fire this before drop handling).
+        onDragEnd: () => {},
       });
 
       const cardDragSource = (cardID: string, columnID: string, cardIndex: number) => ({
@@ -259,9 +272,7 @@ export function useBoardWorkspaceRenderer({
           setCardDragImage(e);
           onCardDragStart(cardID, columnID, cardIndex, e.currentTarget);
         },
-        onDragEnd: () => {
-          console.log("[renderer] card onDragEnd (synthetic):", { cardID, columnID });
-        },
+        onDragEnd: () => {},
       });
 
       const cardDropZone = (columnID: string, cardID?: string) => ({
@@ -269,12 +280,12 @@ export function useBoardWorkspaceRenderer({
           if (!cardDragState) return;
           e.preventDefault();
           e.stopPropagation();
+          if (e.dataTransfer) e.dataTransfer.dropEffect = "move";
           const rect = e.currentTarget.getBoundingClientRect();
           const insertAfter = e.clientY > rect.top + rect.height / 2;
           onCardDragHover(columnID, cardID, insertAfter);
         },
         onDrop: (e: DragEvent<HTMLDivElement>) => {
-          console.log("[renderer] cardDropZone onDrop:", { columnID, cardID: cardID ?? "(none — bottom/placeholder)", hasCardDrag: !!cardDragState });
           if (!cardDragState) return;
           e.preventDefault();
           e.stopPropagation();
@@ -311,37 +322,20 @@ export function useBoardWorkspaceRenderer({
               <div className="flex items-start gap-4 min-h-60">
                 {orderedColumns.map((column, columnIndex) => {
                   const isDraggedColumn = columnDragState?.columnID === column.columnID;
-                  const orderedCards = isDraggedColumn
-                    ? []
-                    : column.cards.slice().sort((a, b) => a.position - b.position);
-
-                  if (isDraggedColumn) {
-                    return (
-                      <div
-                        key={column.columnID}
-                        {...columnContainerDragProps(column.columnID, columnIndex)}
-                        className="w-72 shrink-0 rounded-xl border border-border-light bg-surface-hover relative"
-                        style={{ height: columnDragState.sourceHeight }}
-                      >
-                        {/* Handle stays in DOM (hidden) so the browser doesn't cancel the drag */}
-                        <div
-                          {...columnDragHandle(column.columnID, columnIndex)}
-                          className="opacity-0 pointer-events-none absolute"
-                        />
-                      </div>
-                    );
-                  }
+                  const orderedCards = column.cards.slice().sort((a, b) => a.position - b.position);
 
                   return (
                     <div
                       key={column.columnID}
                       {...columnContainerDragProps(column.columnID, columnIndex)}
-                      className="w-72 shrink-0 border border-border rounded-xl p-3 bg-surface-alt space-y-3"
+                      className={`w-72 shrink-0 border border-border rounded-xl p-3 bg-surface-alt space-y-3 ${
+                        isDraggedColumn ? "opacity-40" : ""
+                      }`}
                     >
                       <div
                         {...columnDragHandle(column.columnID, columnIndex)}
                         className={`flex items-center justify-between gap-2 ${
-                          canDragColumn(column.columnID) ? "cursor-grab active:cursor-grabbing" : ""
+                          canDragColumn(column.columnID) ? "cursor-grab active:cursor-grabbing select-none" : ""
                         }`}
                       >
                         {editingColumnID === column.columnID ? (
@@ -412,16 +406,7 @@ export function useBoardWorkspaceRenderer({
 
                         {orderedCards.map((card, cardIndex) => {
                           const hasDescription = card.description.trim().length > 0;
-
-                          if (cardDragState?.cardID === card.cardID) {
-                            return (
-                              <div
-                                key={card.cardID}
-                                {...cardDropZone(column.columnID, card.cardID)}
-                                className="rounded-lg border border-border-light bg-surface-hover h-10"
-                              />
-                            );
-                          }
+                          const isDraggedCard = cardDragState?.cardID === card.cardID;
 
                           return (
                             <div
@@ -429,39 +414,50 @@ export function useBoardWorkspaceRenderer({
                               {...cardDragSource(card.cardID, column.columnID, cardIndex)}
                               {...cardDropZone(column.columnID, card.cardID)}
                               onClick={() => {
+                                if (isDraggedCard) return;
                                 setOverlayCardID(card.cardID);
                                 setOverlayColumnID(column.columnID);
                                 if (canEditBoard) {
                                   onStartEditingCard(card.cardID, column.columnID);
                                 }
                               }}
-                              className={`rounded-lg border border-border bg-surface-card px-3 py-2.5 ${
-                                canDragCard(card.cardID) ? "cursor-grab active:cursor-grabbing" : "cursor-pointer"
-                              } hover:border-border-light transition-colors`}
+                              className={
+                                isDraggedCard
+                                  ? "rounded-lg border border-border-light bg-surface-hover h-10 relative"
+                                  : `rounded-lg border border-border bg-surface-card px-3 py-2.5 ${
+                                      canDragCard(card.cardID)
+                                        ? "cursor-grab active:cursor-grabbing select-none"
+                                        : "cursor-pointer"
+                                    } hover:border-border-light transition-colors`
+                              }
                             >
-                              <p className="text-sm font-medium truncate">
-                                {card.title}
-                              </p>
-                              {hasDescription && (
-                                <div
-                                  className="mt-1.5 ml-1 inline-flex items-center text-muted"
-                                  aria-label="Card has a description"
-                                  title="Has description"
-                                >
-                                  <svg
-                                    viewBox="0 0 16 16"
-                                    className="h-3.5 w-3.5"
-                                    aria-hidden="true"
-                                    fill="none"
-                                    stroke="currentColor"
-                                    strokeWidth="1.6"
-                                    strokeLinecap="round"
-                                  >
-                                    <line x1="3" y1="4" x2="13" y2="4" />
-                                    <line x1="3" y1="8" x2="11" y2="8" />
-                                    <line x1="3" y1="12" x2="9" y2="12" />
-                                  </svg>
-                                </div>
+                              {!isDraggedCard && (
+                                <>
+                                  <p className="text-sm font-medium truncate">
+                                    {card.title}
+                                  </p>
+                                  {hasDescription && (
+                                    <div
+                                      className="mt-1.5 ml-1 inline-flex items-center text-muted"
+                                      aria-label="Card has a description"
+                                      title="Has description"
+                                    >
+                                      <svg
+                                        viewBox="0 0 16 16"
+                                        className="h-3.5 w-3.5"
+                                        aria-hidden="true"
+                                        fill="none"
+                                        stroke="currentColor"
+                                        strokeWidth="1.6"
+                                        strokeLinecap="round"
+                                      >
+                                        <line x1="3" y1="4" x2="13" y2="4" />
+                                        <line x1="3" y1="8" x2="11" y2="8" />
+                                        <line x1="3" y1="12" x2="9" y2="12" />
+                                      </svg>
+                                    </div>
+                                  )}
+                                </>
                               )}
                             </div>
                           );

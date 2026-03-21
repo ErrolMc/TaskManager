@@ -372,7 +372,8 @@ export function useBoardWorkspace({
     handleCreateCard,
     handleColumnDragStart,
     handleColumnDragHover: columnDrag.hoverColumn,
-    handleColumnDrop: columnDrag.dropColumn,
+    handleColumnDrop: (targetColumnID?: string, insertAfter?: boolean) =>
+      columnDrag.dropColumn(targetColumnID, insertAfter),
     handleCardDragStart,
     handleCardDragHover: cardDrag.hoverCard,
     handleCardDrop: cardDrag.dropCard,
