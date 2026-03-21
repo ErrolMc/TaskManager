@@ -94,6 +94,11 @@ namespace TaskManager.Backend
             {
                 var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
                 db.Database.Migrate();
+
+                if (app.Environment.IsDevelopment())
+                {
+                    DevDataSeeder.Seed(db);
+                }
             }
 
             app.MapDefaultEndpoints();
