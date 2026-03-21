@@ -134,7 +134,8 @@ namespace TaskManager.Backend.Controllers
             bool cardUpdated = await _cardRepository.UpdateCardAsync(
                 request.CardID,
                 request.Name.Trim(),
-                request.Description?.Trim() ?? string.Empty);
+                request.Description?.Trim() ?? string.Empty,
+                request.DueAtUTC);
 
             if (!cardUpdated)
             {
@@ -153,7 +154,8 @@ namespace TaskManager.Backend.Controllers
                     BoardID = listColumn.BoardID,
                     CardID = updatedCard.CardID,
                     Title = updatedCard.Title,
-                    Description = updatedCard.Description
+                    Description = updatedCard.Description,
+                    DueAtUTC = updatedCard.DueAtUTC
                 });
 
             return Ok(updatedCard);

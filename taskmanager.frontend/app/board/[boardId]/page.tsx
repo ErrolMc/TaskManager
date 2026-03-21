@@ -94,6 +94,7 @@ interface CardEditedNotificationPayload {
   CardID: string;
   Title: string;
   Description: string;
+  DueAtUTC: string;
 }
 
 interface ColumnCreatedNotificationPayload {
@@ -420,6 +421,7 @@ export default function BoardViewPage() {
                     ...card,
                     title: data.Title,
                     description: data.Description ?? "",
+                    dueAtUTC: data.DueAtUTC ?? "0001-01-01T00:00:00",
                   }
                 : card
             ),
@@ -627,8 +629,10 @@ export default function BoardViewPage() {
     onSetEditColumnName: boardWorkspace.setEditColumnName,
     onSetEditCardTitle: boardWorkspace.setEditCardTitle,
     onSetEditCardDescription: boardWorkspace.setEditCardDescription,
+    onSetEditCardDueAtUTC: boardWorkspace.setEditCardDueAtUTC,
     onGetCardTitleValue: boardWorkspace.getCardTitleValue,
     onGetCardDescriptionValue: boardWorkspace.getCardDescriptionValue,
+    onGetCardDueAtUTCValue: boardWorkspace.getCardDueAtUTCValue,
     onIsCardDirty: boardWorkspace.isCardDirty,
     onStartEditingColumn: boardWorkspace.startEditingColumn,
     onCancelEditingColumn: boardWorkspace.cancelEditingColumn,

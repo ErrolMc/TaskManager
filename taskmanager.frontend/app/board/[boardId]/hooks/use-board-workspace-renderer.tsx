@@ -26,8 +26,10 @@ interface UseBoardWorkspaceRendererParams {
   onSetEditColumnName: (value: string) => void;
   onSetEditCardTitle: (value: string) => void;
   onSetEditCardDescription: (value: string) => void;
+  onSetEditCardDueAtUTC: (value: string) => void;
   onGetCardTitleValue: (columnID: string, cardID: string) => string;
   onGetCardDescriptionValue: (columnID: string, cardID: string) => string;
+  onGetCardDueAtUTCValue: (columnID: string, cardID: string) => string;
   onIsCardDirty: (columnID: string, cardID: string) => boolean;
   onStartEditingColumn: (columnID: string) => void;
   onCancelEditingColumn: () => void;
@@ -133,8 +135,10 @@ export function useBoardWorkspaceRenderer({
   onSetEditColumnName,
   onSetEditCardTitle,
   onSetEditCardDescription,
+  onSetEditCardDueAtUTC,
   onGetCardTitleValue,
   onGetCardDescriptionValue,
+  onGetCardDueAtUTCValue,
   onIsCardDirty,
   onStartEditingColumn,
   onCancelEditingColumn,
@@ -614,6 +618,66 @@ export function useBoardWorkspaceRenderer({
                   />
                 </div>
 
+                <div className="space-y-1">
+                  <label className="text-xs uppercase tracking-wide text-muted">Due date</label>
+                  {(() => {
+                    const dueAtUTC = onGetCardDueAtUTCValue(overlayColumnID, overlayCardID);
+                    const isDueDateEnabled = dueAtUTC !== "";
+                    return (
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      checked={isDueDateEnabled}
+                      disabled={!canEditBoard}
+                      onChange={(e) => {
+                        if (!canEditBoard) return;
+                        if (editingCardID !== overlayCardID) {
+                          onStartEditingCard(overlayCardID, overlayColumnID);
+                        }
+
+                        if (e.target.checked) {
+                          const now = new Date();
+                          const yyyy = now.getFullYear();
+                          const mm = String(now.getMonth() + 1).padStart(2, "0");
+                          const dd = String(now.getDate()).padStart(2, "0");
+                          const hh = String(now.getHours()).padStart(2, "0");
+                          const min = String(now.getMinutes()).padStart(2, "0");
+                          const ss = String(now.getSeconds()).padStart(2, "0");
+                          onSetEditCardDueAtUTC(`${yyyy}-${mm}-${dd}T${hh}:${min}:${ss}`);
+                        } else {
+                          onSetEditCardDueAtUTC("");
+                        }
+                      }}
+                      className="h-4 w-4 rounded border-border-light accent-accent disabled:opacity-50"
+                    />
+                    {isDueDateEnabled ? (
+                      <input
+                        type="datetime-local"
+                        value={dueAtUTC.slice(0, 16)}
+                        readOnly={!canEditBoard}
+                        onChange={(e) => {
+                          if (!canEditBoard) return;
+                          if (editingCardID !== overlayCardID) {
+                            onStartEditingCard(overlayCardID, overlayColumnID);
+                          }
+                          const localValue = e.target.value;
+                          onSetEditCardDueAtUTC(localValue ? `${localValue}:00` : "");
+                        }}
+                        className="w-full px-3 py-2 text-sm border border-border-light rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-accent/50 read-only:cursor-default"
+                      />
+                    ) : (
+                      <input
+                        type="text"
+                        value="DD/MM/YYYY HH/MM"
+                        readOnly
+                        className="w-full px-3 py-2 text-sm border border-border-light rounded-lg bg-background text-muted read-only:cursor-default"
+                      />
+                    )}
+                  </div>
+                    );
+                  })()}
+                </div>
+
                 {canEditBoard && (
                   <div className="space-y-2 pt-1">
                     <div className="flex items-center gap-2">
@@ -693,11 +757,13 @@ export function useBoardWorkspaceRenderer({
       onCreateCard,
       onCreateListColumn,
       onGetCardDescriptionValue,
+      onGetCardDueAtUTCValue,
       onGetCardTitleValue,
       onIsCardDirty,
       onSaveCardEdit,
       onSaveColumnEdit,
       onSetEditCardDescription,
+      onSetEditCardDueAtUTC,
       onSetEditCardTitle,
       onSetEditColumnName,
       onSetCardTitle,

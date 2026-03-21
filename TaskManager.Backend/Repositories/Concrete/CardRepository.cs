@@ -69,7 +69,7 @@ namespace TaskManager.Backend.Repositories.Concrete
             return await _context.SaveChangesAsync() > 0;
         }
 
-        public async Task<bool> UpdateCardAsync(string cardID, string title, string description)
+        public async Task<bool> UpdateCardAsync(string cardID, string title, string description, DateTime dueAtUTC)
         {
             Card? card = await _context.Cards
                 .FirstOrDefaultAsync(c => c.CardID == cardID);
@@ -79,6 +79,7 @@ namespace TaskManager.Backend.Repositories.Concrete
 
             card.Title = title;
             card.Description = description;
+            card.DueAtUTC = dueAtUTC;
 
             return await _context.SaveChangesAsync() > 0;
         }

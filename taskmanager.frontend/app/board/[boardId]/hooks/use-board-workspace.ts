@@ -43,6 +43,7 @@ export function useBoardWorkspace({
   const [editingCardID, setEditingCardID] = useState<string | null>(null);
   const [editCardTitle, setEditCardTitle] = useState("");
   const [editCardDescription, setEditCardDescription] = useState("");
+  const [editCardDueAtUTC, setEditCardDueAtUTC] = useState("");
   const [savingCardID, setSavingCardID] = useState<string | null>(null);
   const [deletingCardID, setDeletingCardID] = useState<string | null>(null);
 
@@ -105,12 +106,17 @@ export function useBoardWorkspace({
     setEditingCardID(cardID);
     setEditCardTitle(card.title);
     setEditCardDescription(card.description);
+    const normalizedDueAtUTC = card.dueAtUTC === "0001-01-01T00:00:00"
+      ? ""
+      : card.dueAtUTC.slice(0, 19);
+    setEditCardDueAtUTC(normalizedDueAtUTC);
   };
 
   const cancelEditingCard = () => {
     setEditingCardID(null);
     setEditCardTitle("");
     setEditCardDescription("");
+    setEditCardDueAtUTC("");
   };
 
   const getCardTitleValue = (columnID: string, cardID: string) => {
@@ -123,11 +129,23 @@ export function useBoardWorkspace({
     return findCardByColumn(columnID, cardID)?.description ?? "";
   };
 
+  const getCardDueAtUTCValue = (columnID: string, cardID: string) => {
+    const dueAtUTC = editingCardID === cardID
+      ? editCardDueAtUTC
+      : findCardByColumn(columnID, cardID)?.dueAtUTC ?? "";
+    return !dueAtUTC || dueAtUTC === "0001-01-01T00:00:00" ? "" : dueAtUTC.slice(0, 19);
+  };
+
   const isCardDirty = (columnID: string, cardID: string) => {
     if (editingCardID !== cardID) return false;
     const card = findCardByColumn(columnID, cardID);
     if (!card) return false;
-    return editCardTitle !== card.title || editCardDescription !== card.description;
+    const currentDueAtUTC = card.dueAtUTC === "0001-01-01T00:00:00"
+      ? ""
+      : card.dueAtUTC.slice(0, 19);
+    return editCardTitle !== card.title
+      || editCardDescription !== card.description
+      || editCardDueAtUTC !== currentDueAtUTC;
   };
 
   // Coordinated drag start: clear the other drag type first
@@ -285,7 +303,8 @@ export function useBoardWorkspace({
         token,
         editingCardID,
         trimmedTitle,
-        editCardDescription.trim()
+        editCardDescription.trim(),
+        editCardDueAtUTC || "0001-01-01T00:00:00"
       );
       setBoardData((current) => {
         if (!current) return current;
@@ -360,6 +379,7 @@ export function useBoardWorkspace({
     setEditColumnName,
     setEditCardTitle,
     setEditCardDescription,
+    setEditCardDueAtUTC,
     clearColumnDragState: columnDrag.clearColumnDrag,
     startEditingColumn,
     cancelEditingColumn,
@@ -367,6 +387,7 @@ export function useBoardWorkspace({
     cancelEditingCard,
     getCardTitleValue,
     getCardDescriptionValue,
+    getCardDueAtUTCValue,
     isCardDirty,
     handleCreateListColumn,
     handleCreateCard,

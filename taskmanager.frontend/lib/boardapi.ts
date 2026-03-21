@@ -295,12 +295,13 @@ export async function updateCard(
   token: string,
   cardID: string,
   name: string,
-  description: string
+  description: string,
+  dueAtUTC: string
 ): Promise<BoardCard> {
   const res = await fetch(`${CARD_API_BASE}/update`, {
     method: "POST",
     headers: getAuthHeaders(token),
-    body: JSON.stringify({ cardID, name, description }),
+    body: JSON.stringify({ cardID, name, description, dueAtUTC }),
   });
 
   if (!res.ok) {
