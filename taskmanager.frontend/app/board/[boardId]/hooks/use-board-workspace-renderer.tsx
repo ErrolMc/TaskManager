@@ -328,9 +328,7 @@ export function useBoardWorkspaceRenderer({
                     <div
                       key={column.columnID}
                       {...columnContainerDragProps(column.columnID, columnIndex)}
-                      className={`w-72 shrink-0 border border-border rounded-xl p-3 bg-surface-alt space-y-3 ${
-                        isDraggedColumn ? "opacity-40" : ""
-                      }`}
+                      className="w-72 shrink-0 border border-border rounded-xl p-3 bg-surface-alt space-y-3 relative"
                     >
                       <div
                         {...columnDragHandle(column.columnID, columnIndex)}
@@ -465,7 +463,10 @@ export function useBoardWorkspaceRenderer({
 
                       </div>
 
-                      <form onSubmit={(e) => void onCreateCard(e, column.columnID)} className="flex gap-2">
+                      <form
+                        onSubmit={(e) => void onCreateCard(e, column.columnID)}
+                        className="flex gap-2"
+                      >
                         <input
                           type="text"
                           value={cardTitles[column.columnID] ?? ""}
@@ -483,6 +484,10 @@ export function useBoardWorkspaceRenderer({
                           +
                         </button>
                       </form>
+
+                      {isDraggedColumn && (
+                        <div className="absolute inset-0 rounded-xl bg-surface-hover border border-border-light pointer-events-none" />
+                      )}
                     </div>
                   );
                 })}
