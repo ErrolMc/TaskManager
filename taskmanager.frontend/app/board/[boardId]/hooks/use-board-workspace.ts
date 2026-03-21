@@ -1,4 +1,4 @@
-import { useMemo, useState, type Dispatch, type FormEvent, type SetStateAction } from "react";
+import { useEffect, useMemo, useState, type Dispatch, type FormEvent, type SetStateAction } from "react";
 import {
   createCard,
   createListColumn,
@@ -98,6 +98,14 @@ export function useBoardWorkspace({
     return column?.cards.find((item) => item.cardID === cardID) ?? null;
   };
 
+  const findCardByID = (cardID: string) => {
+    for (const column of baseOrderedColumns) {
+      const card = column.cards.find((item) => item.cardID === cardID);
+      if (card) return card;
+    }
+    return null;
+  };
+
   const startEditingCard = (cardID: string, columnID: string) => {
     if (editingCardID === cardID) return;
     const card = findCardByColumn(columnID, cardID);
@@ -147,6 +155,22 @@ export function useBoardWorkspace({
       || editCardDescription !== card.description
       || editCardDueAtUTC !== currentDueAtUTC;
   };
+
+  // Remote edits should win immediately while a card is open.
+  useEffect(() => {
+    if (!editingCardID) return;
+
+    const liveCard = findCardByID(editingCardID);
+    if (!liveCard) return;
+
+    const liveDueAtUTC = liveCard.dueAtUTC === "0001-01-01T00:00:00"
+      ? ""
+      : liveCard.dueAtUTC.slice(0, 19);
+
+    setEditCardTitle((current) => (current === liveCard.title ? current : liveCard.title));
+    setEditCardDescription((current) => (current === liveCard.description ? current : liveCard.description));
+    setEditCardDueAtUTC((current) => (current === liveDueAtUTC ? current : liveDueAtUTC));
+  }, [editingCardID, baseOrderedColumns]);
 
   // Coordinated drag start: clear the other drag type first
   function handleColumnDragStart(columnID: string, startIndex: number, sourceHeight: number, sourceElement?: HTMLElement) {
