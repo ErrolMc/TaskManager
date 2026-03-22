@@ -13,6 +13,7 @@ namespace TaskManager.Backend.Data
         public DbSet<BoardMember> BoardMembers { get; set; }
         public DbSet<ListColumn> ListColumns { get; set; }
         public DbSet<Card> Cards { get; set; }
+        public DbSet<CardMessage> CardMessages { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -72,6 +73,19 @@ namespace TaskManager.Backend.Data
                 entity.HasOne<User>()
                       .WithMany()
                       .HasForeignKey(e => e.CreatedByUserID)
+                      .OnDelete(DeleteBehavior.NoAction);
+            });
+
+            modelBuilder.Entity<CardMessage>(entity =>
+            {
+                entity.HasKey(e => e.MessageID);
+                entity.HasOne<Card>()
+                      .WithMany()
+                      .HasForeignKey(e => e.CardID)
+                      .OnDelete(DeleteBehavior.Cascade);
+                entity.HasOne<User>()
+                      .WithMany()
+                      .HasForeignKey(e => e.SenderUserID)
                       .OnDelete(DeleteBehavior.NoAction);
             });
         }

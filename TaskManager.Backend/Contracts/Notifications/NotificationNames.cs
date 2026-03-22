@@ -14,5 +14,7 @@
         BoardJoined = 9,
         BoardLeft = 10,
         BoardDeleted = 11,
+        CardMessageCreated = 12,
+        CardMessageDeleted = 13,
     }
 }
