@@ -144,6 +144,82 @@ namespace TaskManager.Backend.Data
                 new Card { CardID = Guid.NewGuid().ToString(), ColumnID = btResolved.ColumnID, Title = "SignalR reconnection loop", Description = "The frontend SignalR client was stuck in a reconnection loop after token expiry.", Position = 3, DueAtUTC = now.AddDays(-3), CreatedByUserID = alice.UserID }
             );
 
+            // Seed realistic card discussions in development.
+            string[] participantUserIDs = [alice.UserID, bob.UserID, charlie.UserID, diana.UserID];
+            string[] openerTemplates =
+            [
+                "Kicking this off:",
+                "Quick update:",
+                "Plan for this task:",
+                "I looked into this and",
+                "Status check:"
+            ];
+
+            string[] followUpTemplates =
+            [
+                "I can pick this up today and share progress before EOD.",
+                "Let's split this into smaller sub-tasks so we can track it clearly.",
+                "I tested this locally and the approach looks good so far.",
+                "We might need a quick review from another teammate before closing.",
+                "I'll post screenshots and notes once the first pass is done."
+            ];
+
+            string[] secondFollowUpTemplates =
+            [
+                "I added a checklist in the card so we can track what is done.",
+                "Can someone review the latest update when you have a minute?",
+                "I pushed a first pass and left a short summary of trade-offs.",
+                "I'll keep this in progress until we verify it in staging.",
+                "If this is blocked, we should note the dependency in the card."
+            ];
+
+            List<CardMessage> cardMessages = db.Cards.Local
+                .SelectMany((card, index) =>
+                {
+                    var messages = new List<CardMessage>
+                    {
+                        new CardMessage
+                        {
+                            MessageID = Guid.NewGuid().ToString(),
+                            CardID = card.CardID,
+                            SenderUserID = card.CreatedByUserID,
+                            Message = $"{openerTemplates[index % openerTemplates.Length]} {card.Title}. {card.Description}",
+                            CreateTimeUTC = now.AddDays(-2).AddMinutes(index * 9)
+                        }
+                    };
+
+                    if (index % 6 != 0)
+                    {
+                        string followUpSenderUserID = participantUserIDs[(index + 1) % participantUserIDs.Length];
+                        messages.Add(new CardMessage
+                        {
+                            MessageID = Guid.NewGuid().ToString(),
+                            CardID = card.CardID,
+                            SenderUserID = followUpSenderUserID,
+                            Message = followUpTemplates[index % followUpTemplates.Length],
+                            CreateTimeUTC = now.AddDays(-2).AddMinutes(index * 9 + 4)
+                        });
+
+                        if (index % 4 != 0)
+                        {
+                            string secondFollowUpSenderUserID = participantUserIDs[(index + 2) % participantUserIDs.Length];
+                            messages.Add(new CardMessage
+                            {
+                                MessageID = Guid.NewGuid().ToString(),
+                                CardID = card.CardID,
+                                SenderUserID = secondFollowUpSenderUserID,
+                                Message = secondFollowUpTemplates[index % secondFollowUpTemplates.Length],
+                                CreateTimeUTC = now.AddDays(-2).AddMinutes(index * 9 + 7)
+                            });
+                        }
+                    }
+
+                    return messages;
+                })
+                .ToList();
+
+            db.CardMessages.AddRange(cardMessages);
+
             db.SaveChanges();
         }
     }
