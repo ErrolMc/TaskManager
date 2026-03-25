@@ -116,6 +116,23 @@ interface BoardMembershipNotificationPayload {
   UserID: string;
 }
 
+interface CardMessageCreatedNotificationPayload {
+  BoardID: string;
+  CardID: string;
+  CardMessageID: string;
+}
+
+interface CardMessageDeletedNotificationPayload {
+  BoardID: string;
+  CardID: string;
+  CardMessageID: string;
+}
+
+interface CardMessageRealtimeSignal {
+  cardID: string;
+  revision: number;
+}
+
 function sortColumnsByPosition(columns: BoardListColumn[]) {
   return columns.slice().sort((a, b) => a.position - b.position);
 }
@@ -236,6 +253,7 @@ export default function BoardViewPage() {
   const [changeRoleOpen, setChangeRoleOpen] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
   const [actionError, setActionError] = useState("");
+  const [cardMessageSignal, setCardMessageSignal] = useState<CardMessageRealtimeSignal | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -303,6 +321,8 @@ export default function BoardViewPage() {
       "CardEdited",
       "ColumnCreated",
       "CardCreated",
+      "CardMessageCreated",
+      "CardMessageDeleted",
       "BoardJoined",
       "BoardLeft",
     ];
@@ -530,6 +550,26 @@ export default function BoardViewPage() {
       void loadBoardMembers();
     };
 
+    const handleCardMessageCreated = (payload: unknown) => {
+      const data = payload as CardMessageCreatedNotificationPayload;
+      if (!data?.CardID || !data?.CardMessageID) return;
+
+      setCardMessageSignal({
+        cardID: data.CardID,
+        revision: Date.now(),
+      });
+    };
+
+    const handleCardMessageDeleted = (payload: unknown) => {
+      const data = payload as CardMessageDeletedNotificationPayload;
+      if (!data?.CardID || !data?.CardMessageID) return;
+
+      setCardMessageSignal({
+        cardID: data.CardID,
+        revision: Date.now(),
+      });
+    };
+
     for (const eventName of eventsToSubscribe) {
       const handler =
         eventName === "ColumnMoved"
@@ -546,6 +586,10 @@ export default function BoardViewPage() {
                     ? handleColumnCreated
                     : eventName === "CardCreated"
                       ? handleCardCreated
+                        : eventName === "CardMessageCreated"
+                          ? handleCardMessageCreated
+                          : eventName === "CardMessageDeleted"
+                            ? handleCardMessageDeleted
                       : eventName === "BoardJoined"
                         ? handleBoardJoined
                         : eventName === "BoardLeft"
@@ -606,6 +650,11 @@ export default function BoardViewPage() {
   });
 
   const boardWorkspaceSection = useBoardWorkspaceRenderer({
+    token,
+    boardID: boardId,
+    currentUserID: userID,
+    boardMembers: boardData?.members ?? [],
+    cardMessageRealtimeSignal: cardMessageSignal,
     isLoading,
     error,
     boardActionError: boardWorkspace.boardActionError,

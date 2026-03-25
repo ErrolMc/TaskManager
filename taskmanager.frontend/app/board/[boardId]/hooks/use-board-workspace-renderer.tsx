@@ -1,8 +1,15 @@
 import { useEffect, useMemo, useRef, useState, type DragEvent, type FormEvent, type ReactNode } from "react";
 import type { BoardListColumn } from "@/lib/boardapi";
+import { createCardMessage, deleteCardMessage, getCardMessages, type CardMessageItem } from "@/lib/cardmessageapi";
+import type { BoardMember } from "@/lib/boardapi";
 import type { CardDragState, ColumnDragState } from "./drag-utils";
 
 interface UseBoardWorkspaceRendererParams {
+  cardMessageRealtimeSignal: { cardID: string; revision: number } | null;
+  token: string | null;
+  boardID: string;
+  currentUserID: string | null;
+  boardMembers: BoardMember[];
   isLoading: boolean;
   error: string;
   boardActionError: string;
@@ -111,7 +118,24 @@ function setCardDragImage(event: DragEvent<HTMLDivElement>) {
   });
 }
 
+function formatMessageTime(utc: string) {
+  const date = new Date(utc);
+  if (Number.isNaN(date.getTime())) return "";
+
+  return new Intl.DateTimeFormat(undefined, {
+    month: "short",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(date);
+}
+
 export function useBoardWorkspaceRenderer({
+  cardMessageRealtimeSignal,
+  token,
+  boardID,
+  currentUserID,
+  boardMembers,
   isLoading,
   error,
   boardActionError,
@@ -162,8 +186,21 @@ export function useBoardWorkspaceRenderer({
   const [overlayCardID, setOverlayCardID] = useState<string | null>(null);
   const [overlayColumnID, setOverlayColumnID] = useState<string | null>(null);
   const [isAddListOpen, setIsAddListOpen] = useState(false);
+  const [cardMessages, setCardMessages] = useState<CardMessageItem[]>([]);
+  const [messageDraft, setMessageDraft] = useState("");
+  const [messagesLoading, setMessagesLoading] = useState(false);
+  const [messagesError, setMessagesError] = useState("");
+  const [isSendingMessage, setIsSendingMessage] = useState(false);
+  const [deletingMessageID, setDeletingMessageID] = useState<string | null>(null);
+  const [activeMessagesCardID, setActiveMessagesCardID] = useState<string | null>(null);
   const addListContainerRef = useRef<HTMLDivElement | null>(null);
+  const messagesEndRef = useRef<HTMLDivElement | null>(null);
   const wasCreateColumnLoadingRef = useRef(false);
+
+  const usernameByID = useMemo(
+    () => new Map(boardMembers.map((member) => [member.user.userID, member.user.username])),
+    [boardMembers]
+  );
 
   useEffect(() => {
     if (!overlayCardID) return;
@@ -220,8 +257,117 @@ export function useBoardWorkspaceRenderer({
     }
   }, [createColumnLoading, newColumnName]);
 
+  useEffect(() => {
+    if (!token || !boardID || !overlayCardID) {
+      setCardMessages([]);
+      setActiveMessagesCardID(null);
+      setMessagesError("");
+      return;
+    }
+
+    let isDisposed = false;
+    setMessagesLoading(true);
+    setMessagesError("");
+    setActiveMessagesCardID(overlayCardID);
+
+    void getCardMessages(token, boardID, overlayCardID)
+      .then((items) => {
+        if (isDisposed) return;
+        setCardMessages(items);
+      })
+      .catch((err: unknown) => {
+        if (isDisposed) return;
+        setMessagesError(err instanceof Error ? err.message : "Failed to load messages");
+      })
+      .finally(() => {
+        if (isDisposed) return;
+        setMessagesLoading(false);
+      });
+
+    return () => {
+      isDisposed = true;
+    };
+  }, [token, boardID, overlayCardID]);
+
+  useEffect(() => {
+    if (!overlayCardID || activeMessagesCardID !== overlayCardID) return;
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
+  }, [overlayCardID, activeMessagesCardID, cardMessages]);
+
+  useEffect(() => {
+    if (!token || !boardID || !overlayCardID || !cardMessageRealtimeSignal) return;
+    if (cardMessageRealtimeSignal.cardID !== overlayCardID) return;
+
+    let isDisposed = false;
+    setMessagesError("");
+
+    void getCardMessages(token, boardID, overlayCardID)
+      .then((items) => {
+        if (isDisposed) return;
+        setCardMessages(items);
+      })
+      .catch((err: unknown) => {
+        if (isDisposed) return;
+        setMessagesError(err instanceof Error ? err.message : "Failed to load messages");
+      });
+
+    return () => {
+      isDisposed = true;
+    };
+  }, [token, boardID, overlayCardID, cardMessageRealtimeSignal]);
+
   return useMemo(
     () => {
+      const closeOverlay = () => {
+        onCancelEditingCard();
+        setOverlayCardID(null);
+        setOverlayColumnID(null);
+        setMessageDraft("");
+        setMessagesError("");
+      };
+
+      const handleSendMessage = async () => {
+        if (!token || !boardID || !overlayCardID || !currentUserID) return;
+
+        const trimmedMessage = messageDraft.trim();
+        if (!trimmedMessage) return;
+
+        setIsSendingMessage(true);
+        setMessagesError("");
+
+        try {
+          const created = await createCardMessage(token, boardID, overlayCardID, trimmedMessage);
+          const resolvedUsername = usernameByID.get(created.senderUserID) ?? "You";
+          setCardMessages((current) => [
+            ...current,
+            {
+              ...created,
+              senderUsername: resolvedUsername,
+            },
+          ]);
+          setMessageDraft("");
+        } catch (err) {
+          setMessagesError(err instanceof Error ? err.message : "Failed to send message");
+        } finally {
+          setIsSendingMessage(false);
+        }
+      };
+
+      const handleDeleteMessage = async (messageID: string) => {
+        if (!token || !boardID || !overlayCardID || !canEditBoard) return;
+
+        setDeletingMessageID(messageID);
+        setMessagesError("");
+        try {
+          await deleteCardMessage(token, boardID, messageID);
+          setCardMessages((current) => current.filter((item) => item.messageID !== messageID));
+        } catch (err) {
+          setMessagesError(err instanceof Error ? err.message : "Failed to delete message");
+        } finally {
+          setDeletingMessageID(null);
+        }
+      };
+
       // --- Drag prop helpers ---
       const canDragColumn = (columnID: string) =>
         canEditBoard && editingColumnID !== columnID && !editingCardID;
@@ -555,172 +701,247 @@ export function useBoardWorkspaceRenderer({
           {overlayCardID && overlayColumnID && (
             <div
               className="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
-              onClick={() => {
-                onCancelEditingCard();
-                setOverlayCardID(null);
-                setOverlayColumnID(null);
-              }}
+              onClick={closeOverlay}
             >
               <div
-                className="w-full max-w-lg bg-surface border border-border rounded-xl shadow-lg shadow-black/30 p-6 pt-4 space-y-2.5"
+                className="relative w-full max-w-6xl bg-surface border border-border rounded-xl shadow-lg shadow-black/30 p-6 pt-4 overflow-hidden"
                 onClick={(e) => e.stopPropagation()}
               >
-                <div className="flex items-start gap-3">
-                  <input
-                    type="text"
-                    value={onGetCardTitleValue(overlayColumnID, overlayCardID)}
-                    readOnly={!canEditBoard}
-                    onChange={(e) => {
-                      if (!canEditBoard) return;
-                      if (editingCardID !== overlayCardID) {
-                        onStartEditingCard(overlayCardID, overlayColumnID);
-                      }
-                      onSetEditCardTitle(e.target.value);
-                    }}
-                    className="-ml-2 min-w-0 flex-1 bg-transparent text-lg font-medium border border-transparent rounded-lg pl-3 pr-3 py-2 focus:outline-none focus:border-border-light focus:ring-2 focus:ring-accent/50"
-                  />
+                <div
+                  className="hidden md:block absolute top-0 bottom-0 left-[54.545%] w-[2px] bg-border pointer-events-none"
+                  aria-hidden="true"
+                />
+
+                <div className="mb-3 flex items-center justify-between">
+                  <h3 className="text-sm font-medium text-muted uppercase tracking-wide">Card Details</h3>
                   <button
                     type="button"
-                    onClick={() => {
-                      onCancelEditingCard();
-                      setOverlayCardID(null);
-                      setOverlayColumnID(null);
-                    }}
+                    onClick={closeOverlay}
                     className="text-muted hover:text-foreground transition-colors text-xl leading-none px-1"
                   >
                     ✕
                   </button>
                 </div>
 
-                <div className="space-y-1">
-                  <label className="text-xs uppercase tracking-wide text-muted">Description</label>
-                  <textarea
-                    value={onGetCardDescriptionValue(overlayColumnID, overlayCardID)}
-                    readOnly={!canEditBoard}
-                    spellCheck={focusedDescriptionCardID === overlayCardID}
-                    rows={6}
-                    placeholder="Add a description..."
-                    onFocus={() => {
-                      if (canEditBoard && editingCardID !== overlayCardID) {
-                        onStartEditingCard(overlayCardID, overlayColumnID);
-                      }
-                      setFocusedDescriptionCardID(overlayCardID);
-                    }}
-                    onBlur={() => setFocusedDescriptionCardID(null)}
-                    onChange={(e) => {
-                      if (!canEditBoard) return;
-                      if (editingCardID !== overlayCardID) {
-                        onStartEditingCard(overlayCardID, overlayColumnID);
-                      }
-                      onSetEditCardDescription(e.target.value);
-                    }}
-                    className="w-full px-3 py-2 text-sm border border-border-light rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-accent/50 resize-none read-only:cursor-default"
-                  />
-                </div>
-
-                <div className="space-y-1">
-                  <label className="text-xs uppercase tracking-wide text-muted">Due date</label>
-                  {(() => {
-                    const dueAtUTC = onGetCardDueAtUTCValue(overlayColumnID, overlayCardID);
-                    const isDueDateEnabled = dueAtUTC !== "";
-                    return (
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="checkbox"
-                      checked={isDueDateEnabled}
-                      disabled={!canEditBoard}
-                      onChange={(e) => {
-                        if (!canEditBoard) return;
-                        if (editingCardID !== overlayCardID) {
-                          onStartEditingCard(overlayCardID, overlayColumnID);
-                        }
-
-                        if (e.target.checked) {
-                          const now = new Date();
-                          const yyyy = now.getFullYear();
-                          const mm = String(now.getMonth() + 1).padStart(2, "0");
-                          const dd = String(now.getDate()).padStart(2, "0");
-                          const hh = String(now.getHours()).padStart(2, "0");
-                          const min = String(now.getMinutes()).padStart(2, "0");
-                          const ss = String(now.getSeconds()).padStart(2, "0");
-                          onSetEditCardDueAtUTC(`${yyyy}-${mm}-${dd}T${hh}:${min}:${ss}`);
-                        } else {
-                          onSetEditCardDueAtUTC("");
-                        }
-                      }}
-                      className="h-4 w-4 rounded border-border-light accent-accent disabled:opacity-50"
-                    />
-                    {isDueDateEnabled ? (
+                <div className="grid gap-0 md:grid-cols-[1.2fr_1fr]">
+                  <div className="space-y-2.5 md:pr-5">
+                    <div className="flex items-start gap-3">
                       <input
-                        type="datetime-local"
-                        value={dueAtUTC.slice(0, 16)}
+                        type="text"
+                        value={onGetCardTitleValue(overlayColumnID, overlayCardID)}
                         readOnly={!canEditBoard}
                         onChange={(e) => {
                           if (!canEditBoard) return;
                           if (editingCardID !== overlayCardID) {
                             onStartEditingCard(overlayCardID, overlayColumnID);
                           }
-                          const localValue = e.target.value;
-                          onSetEditCardDueAtUTC(localValue ? `${localValue}:00` : "");
+                          onSetEditCardTitle(e.target.value);
                         }}
-                        className="w-full px-3 py-2 text-sm border border-border-light rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-accent/50 read-only:cursor-default"
+                        className="-ml-2 min-w-0 flex-1 bg-transparent text-lg font-medium border border-transparent rounded-lg pl-3 pr-3 py-2 focus:outline-none focus:border-border-light focus:ring-2 focus:ring-accent/50"
                       />
-                    ) : (
-                      <input
-                        type="text"
-                        value="DD/MM/YYYY HH/MM"
-                        readOnly
-                        className="w-full px-3 py-2 text-sm border border-border-light rounded-lg bg-background text-muted read-only:cursor-default"
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="text-xs uppercase tracking-wide text-muted">Description</label>
+                      <textarea
+                        value={onGetCardDescriptionValue(overlayColumnID, overlayCardID)}
+                        readOnly={!canEditBoard}
+                        spellCheck={focusedDescriptionCardID === overlayCardID}
+                        rows={8}
+                        placeholder="Add a description..."
+                        onFocus={() => {
+                          if (canEditBoard && editingCardID !== overlayCardID) {
+                            onStartEditingCard(overlayCardID, overlayColumnID);
+                          }
+                          setFocusedDescriptionCardID(overlayCardID);
+                        }}
+                        onBlur={() => setFocusedDescriptionCardID(null)}
+                        onChange={(e) => {
+                          if (!canEditBoard) return;
+                          if (editingCardID !== overlayCardID) {
+                            onStartEditingCard(overlayCardID, overlayColumnID);
+                          }
+                          onSetEditCardDescription(e.target.value);
+                        }}
+                        className="w-full px-3 py-2 text-sm border border-border-light rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-accent/50 resize-none read-only:cursor-default"
                       />
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="text-xs uppercase tracking-wide text-muted">Due date</label>
+                      {(() => {
+                        const dueAtUTC = onGetCardDueAtUTCValue(overlayColumnID, overlayCardID);
+                        const isDueDateEnabled = dueAtUTC !== "";
+                        return (
+                          <div className="flex items-center gap-2">
+                            <input
+                              type="checkbox"
+                              checked={isDueDateEnabled}
+                              disabled={!canEditBoard}
+                              onChange={(e) => {
+                                if (!canEditBoard) return;
+                                if (editingCardID !== overlayCardID) {
+                                  onStartEditingCard(overlayCardID, overlayColumnID);
+                                }
+
+                                if (e.target.checked) {
+                                  const now = new Date();
+                                  const yyyy = now.getFullYear();
+                                  const mm = String(now.getMonth() + 1).padStart(2, "0");
+                                  const dd = String(now.getDate()).padStart(2, "0");
+                                  const hh = String(now.getHours()).padStart(2, "0");
+                                  const min = String(now.getMinutes()).padStart(2, "0");
+                                  const ss = String(now.getSeconds()).padStart(2, "0");
+                                  onSetEditCardDueAtUTC(`${yyyy}-${mm}-${dd}T${hh}:${min}:${ss}`);
+                                } else {
+                                  onSetEditCardDueAtUTC("");
+                                }
+                              }}
+                              className="h-4 w-4 rounded border-border-light accent-accent disabled:opacity-50"
+                            />
+                            {isDueDateEnabled ? (
+                              <input
+                                type="datetime-local"
+                                value={dueAtUTC.slice(0, 16)}
+                                readOnly={!canEditBoard}
+                                onChange={(e) => {
+                                  if (!canEditBoard) return;
+                                  if (editingCardID !== overlayCardID) {
+                                    onStartEditingCard(overlayCardID, overlayColumnID);
+                                  }
+                                  const localValue = e.target.value;
+                                  onSetEditCardDueAtUTC(localValue ? `${localValue}:00` : "");
+                                }}
+                                className="w-full px-3 py-2 text-sm border border-border-light rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-accent/50 read-only:cursor-default"
+                              />
+                            ) : (
+                              <input
+                                type="text"
+                                value="DD/MM/YYYY HH/MM"
+                                readOnly
+                                className="w-full px-3 py-2 text-sm border border-border-light rounded-lg bg-background text-muted read-only:cursor-default"
+                              />
+                            )}
+                          </div>
+                        );
+                      })()}
+                    </div>
+
+                    {canEditBoard && (
+                      <div className="space-y-2 pt-1">
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => void onSaveCardEdit()}
+                            disabled={!onIsCardDirty(overlayColumnID, overlayCardID) || savingCardID === overlayCardID}
+                            className="px-4 py-2 bg-accent text-white rounded-lg font-medium hover:bg-accent-hover disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                          >
+                            Save
+                          </button>
+                          <button
+                            type="button"
+                            onClick={onCancelEditingCard}
+                            disabled={savingCardID === overlayCardID}
+                            className="px-4 py-2 border border-border-light rounded-lg hover:bg-surface-hover disabled:opacity-50 transition-colors"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+
+                        <div className="border-t border-border pt-2">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const confirmed = window.confirm("Delete this card? This cannot be undone.");
+                              if (!confirmed) return;
+
+                              void onDeleteCard(overlayCardID).then((deleted) => {
+                                if (deleted) {
+                                  closeOverlay();
+                                }
+                              });
+                            }}
+                            disabled={savingCardID === overlayCardID || deletingCardID === overlayCardID}
+                            className="w-full px-4 py-2 border border-red-500/40 text-red-500 rounded-lg hover:bg-red-500/10 disabled:opacity-50 transition-colors"
+                          >
+                            {deletingCardID === overlayCardID ? "Deleting..." : "Delete Card"}
+                          </button>
+                        </div>
+                      </div>
                     )}
                   </div>
-                    );
-                  })()}
+
+                  <aside className="rounded-xl bg-surface-alt p-3 flex flex-col h-[30rem] md:ml-5 md:pl-5">
+                    <div className="mb-2">
+                      <h4 className="text-sm font-semibold">Card Chat</h4>
+                      <p className="text-xs text-muted">Discussion for this card</p>
+                    </div>
+
+                    <div className="flex-1 overflow-y-auto space-y-2 pr-1">
+                      {messagesLoading && <p className="text-xs text-muted">Loading messages...</p>}
+                      {!messagesLoading && cardMessages.length === 0 && (
+                        <p className="text-xs text-muted">No messages yet. Start the conversation.</p>
+                      )}
+
+                      {cardMessages.map((item) => {
+                        const isCurrentUser = Boolean(currentUserID && item.senderUserID === currentUserID);
+                        const displayName = item.senderUsername || usernameByID.get(item.senderUserID) || "Unknown user";
+
+                        return (
+                          <div
+                            key={item.messageID}
+                            className={`rounded-lg border px-3 py-2 text-sm ${
+                              isCurrentUser
+                                ? "bg-accent/10 border-accent/30"
+                                : "bg-background border-border-light"
+                            }`}
+                          >
+                            <div className="mb-1 flex items-center justify-between gap-2">
+                              <span className="text-xs font-medium text-muted">{displayName}</span>
+                              <div className="flex items-center gap-2">
+                                <span className="text-[11px] text-muted/80">{formatMessageTime(item.createTimeUTC)}</span>
+                                {canEditBoard && isCurrentUser && (
+                                  <button
+                                    type="button"
+                                    onClick={() => void handleDeleteMessage(item.messageID)}
+                                    disabled={deletingMessageID === item.messageID}
+                                    className="text-[11px] text-red-500 hover:text-red-400 disabled:opacity-50"
+                                  >
+                                    {deletingMessageID === item.messageID ? "..." : "Delete"}
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+                            <p className="whitespace-pre-wrap break-words">{item.message}</p>
+                          </div>
+                        );
+                      })}
+                      <div ref={messagesEndRef} />
+                    </div>
+
+                    <div className="mt-3 border-t border-border pt-3 space-y-2">
+                      {messagesError && (
+                        <p className="text-xs text-red-500 bg-red-500/10 rounded-md px-2 py-1">{messagesError}</p>
+                      )}
+                      <textarea
+                        value={messageDraft}
+                        onChange={(e) => setMessageDraft(e.target.value)}
+                        rows={3}
+                        disabled={!canEditBoard || isSendingMessage}
+                        placeholder={canEditBoard ? "Write a message..." : "Viewers cannot send messages"}
+                        className="w-full resize-none rounded-lg border border-border-light bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent/50 disabled:opacity-60"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => void handleSendMessage()}
+                        disabled={!canEditBoard || isSendingMessage || messageDraft.trim().length === 0}
+                        className="w-full px-3 py-2 text-sm bg-accent text-white rounded-lg font-medium hover:bg-accent-hover disabled:opacity-50"
+                      >
+                        {isSendingMessage ? "Sending..." : "Send"}
+                      </button>
+                    </div>
+                  </aside>
                 </div>
-
-                {canEditBoard && (
-                  <div className="space-y-2 pt-1">
-                    <div className="flex items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={() => void onSaveCardEdit()}
-                        disabled={!onIsCardDirty(overlayColumnID, overlayCardID) || savingCardID === overlayCardID}
-                        className="px-4 py-2 bg-accent text-white rounded-lg font-medium hover:bg-accent-hover disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                      >
-                        Save
-                      </button>
-                      <button
-                        type="button"
-                        onClick={onCancelEditingCard}
-                        disabled={savingCardID === overlayCardID}
-                        className="px-4 py-2 border border-border-light rounded-lg hover:bg-surface-hover disabled:opacity-50 transition-colors"
-                      >
-                        Cancel
-                      </button>
-                    </div>
-
-                    <div className="border-t border-border pt-2">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const confirmed = window.confirm("Delete this card? This cannot be undone.");
-                          if (!confirmed) return;
-
-                          void onDeleteCard(overlayCardID).then((deleted) => {
-                            if (deleted) {
-                              setOverlayCardID(null);
-                              setOverlayColumnID(null);
-                            }
-                          });
-                        }}
-                        disabled={savingCardID === overlayCardID || deletingCardID === overlayCardID}
-                        className="w-full px-4 py-2 border border-red-500/40 text-red-500 rounded-lg hover:bg-red-500/10 disabled:opacity-50 transition-colors"
-                      >
-                        {deletingCardID === overlayCardID ? "Deleting..." : "Delete Card"}
-                      </button>
-                    </div>
-                  </div>
-                )}
               </div>
             </div>
           )}
@@ -728,11 +949,17 @@ export function useBoardWorkspaceRenderer({
       );
     },
     [
+      boardID,
+      boardMembers,
+      cardMessageRealtimeSignal,
       boardActionError,
       canEditBoard,
       cardDragState,
+      cardMessages,
       cardTitles,
       columnDragState,
+      currentUserID,
+      deletingMessageID,
       editColumnName,
       createColumnLoading,
       creatingCards,
@@ -740,8 +967,12 @@ export function useBoardWorkspaceRenderer({
       editingColumnID,
       error,
       focusedDescriptionCardID,
+      isSendingMessage,
       isLoading,
       isAddListOpen,
+      messageDraft,
+      messagesError,
+      messagesLoading,
       newColumnName,
       overlayCardID,
       overlayColumnID,
@@ -774,7 +1005,9 @@ export function useBoardWorkspaceRenderer({
       savingColumnID,
       deletingCardID,
       setNewColumnName,
+      token,
       onDeleteCard,
+      usernameByID,
     ]
   );
 }

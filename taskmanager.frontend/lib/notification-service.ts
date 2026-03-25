@@ -16,6 +16,8 @@ export type NotificationEventName =
   | "CardEdited"
   | "ColumnCreated"
   | "CardCreated"
+  | "CardMessageCreated"
+  | "CardMessageDeleted"
   | "BoardJoined"
   | "BoardLeft";
 
@@ -36,6 +38,8 @@ const NOTIFICATION_EVENTS: NotificationEventName[] = [
   "CardEdited",
   "ColumnCreated",
   "CardCreated",
+  "CardMessageCreated",
+  "CardMessageDeleted",
   "BoardJoined",
   "BoardLeft",
 ];

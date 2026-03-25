@@ -36,6 +36,62 @@ namespace TaskManager.Backend.Controllers
             _notificationService = notificationService;
         }
 
+        [HttpGet("getbycard")]
+        [ProducesResponseType<List<CardMessageResponse>>(StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+        [ProducesResponseType(StatusCodes.Status403Forbidden)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        public async Task<IActionResult> GetMessagesForCard([FromQuery] GetCardMessagesRequest request)
+        {
+            if (string.IsNullOrWhiteSpace(request.BoardID))
+                return BadRequest("Board ID is required");
+
+            if (string.IsNullOrWhiteSpace(request.CardID))
+                return BadRequest("Card ID is required");
+
+            string? currentUserID = GetCurrentUserID();
+            if (string.IsNullOrWhiteSpace(currentUserID))
+                return Unauthorized("Unable to resolve authenticated user");
+
+            BoardMember? currentUserMembership = await _boardMemberRepository.GetBoardMemberAsync(request.BoardID, currentUserID);
+            if (currentUserMembership == null)
+                return Forbid();
+
+            Card? card = await _cardRepository.GetCardByIdAsync(request.CardID);
+            if (card == null)
+                return NotFound("Card not found");
+
+            ListColumn? listColumn = await _listColumnRepository.GetListColumnByIdAsync(card.ColumnID);
+            if (listColumn == null)
+                return NotFound("List column not found");
+
+            if (!string.Equals(listColumn.BoardID, request.BoardID, StringComparison.Ordinal))
+                return BadRequest("Card does not belong to the provided board");
+
+            List<CardMessageResponse> messages = await _dbContext.CardMessages
+                .AsNoTracking()
+                .Where(message => message.CardID == request.CardID)
+                .Join(
+                    _dbContext.Users.AsNoTracking(),
+                    message => message.SenderUserID,
+                    user => user.UserID,
+                    (message, user) => new CardMessageResponse
+                    {
+                        MessageID = message.MessageID,
+                        CardID = message.CardID,
+                        Message = message.Message,
+                        SenderUserID = message.SenderUserID,
+                        SenderUsername = user.Username,
+                        CreateTimeUTC = message.CreateTimeUTC
+                    }
+                )
+                .OrderBy(message => message.CreateTimeUTC)
+                .ToListAsync();
+
+            return Ok(messages);
+        }
+
         [HttpPost("create")]
         [ProducesResponseType<CardMessage>(StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
