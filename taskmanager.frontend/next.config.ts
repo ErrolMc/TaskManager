@@ -1,15 +1,17 @@
 import type { NextConfig } from "next";
 
+const backendUrl = process.env.BACKEND_URL ?? "http://backend";
+
 const nextConfig: NextConfig = {
   async rewrites() {
     return [
       {
         source: "/api/:path*",
-        destination: `${process.env.BACKEND_URL}/api/:path*`,
+        destination: `${backendUrl}/api/:path*`,
       },
       {
         source: "/hubs/:path*",
-        destination: `${process.env.BACKEND_URL}/hubs/:path*`,
+        destination: `${backendUrl}/hubs/:path*`,
       },
     ];
   },
